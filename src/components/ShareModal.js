@@ -7,7 +7,7 @@ function ShareModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const currentUrl = window.location.href;
-  const pageTitle = document.title || 'Binance FAQ';
+  const pageTitle = document.title || 'ONFA Wiki';
 
   const shareToFacebook = () => {
     const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`;

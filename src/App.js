@@ -357,10 +357,10 @@ function App() {
   };
 
   return (
-    <div className="binance-faq">
+    <div className="onfa-wiki">
       <Header onPageNavigate={handlePageNavigate} />
 
-      <div className="faq-container">
+      <div className="wiki-container">
         {/* Mobile Sidebar Menu Button */}
         <button 
           className="mobile-sidebar-toggle"

@@ -46,15 +46,15 @@ const defaultData = {
       type: 'single'
     },
     {
-      id: 'binance-wallet',
-      title: 'Ví Binance',
+      id: 'onfa-wallet',
+      title: 'Ví ONFA',
       icon: 'wallet',
       type: 'parent',
       children: []
     },
     {
-      id: 'binance-junior',
-      title: 'Binance Junior',
+      id: 'onfa-junior',
+      title: 'ONFA Junior',
       icon: 'clock',
       type: 'single'
     }
@@ -89,14 +89,14 @@ const defaultData = {
     },
     {
       id: 'guide',
-      title: 'Bắt đầu mua và bán tiền mã hóa trên Binance Lite',
-      content: '<h2>Bắt đầu mua và bán tiền mã hóa trên Binance Lite</h2><p>Bạn có thể tải ứng dụng Binance để dễ dàng mua, bán hoặc chuyển đổi tiền mã hóa. Binance Lite là phiên bản mặc định dành cho người dùng mới, cung cấp giao diện rõ ràng và dễ sử dụng.</p><p>Với Binance Lite, bạn có thể bắt đầu giao dịch tiền mã hóa một cách nhanh chóng và an toàn. Giao diện được thiết kế đơn giản, phù hợp cho cả người mới bắt đầu và người dùng có kinh nghiệm.</p>',
+      title: 'Bắt đầu mua và bán tiền mã hóa trên ONFA Lite',
+      content: '<h2>Bắt đầu mua và bán tiền mã hóa trên ONFA Lite</h2><p>Bạn có thể tải ứng dụng ONFA để dễ dàng mua, bán hoặc chuyển đổi tiền mã hóa. ONFA Lite là phiên bản mặc định dành cho người dùng mới, cung cấp giao diện rõ ràng và dễ sử dụng.</p><p>Với ONFA Lite, bạn có thể bắt đầu giao dịch tiền mã hóa một cách nhanh chóng và an toàn. Giao diện được thiết kế đơn giản, phù hợp cho cả người mới bắt đầu và người dùng có kinh nghiệm.</p>',
       publishDate: '2021-04-12'
     },
     {
-      id: 'binance-junior',
-      title: 'Binance Junior',
-      content: '<h2>Binance Junior</h2><p>Nội dung về Binance Junior...</p>',
+      id: 'onfa-junior',
+      title: 'ONFA Junior',
+      content: '<h2>ONFA Junior</h2><p>Nội dung về ONFA Junior...</p>',
       publishDate: '2024-01-19'
     }
   ]

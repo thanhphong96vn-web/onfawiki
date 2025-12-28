@@ -62,7 +62,7 @@ function PageContent({ page, onPageChange }) {
   const translatedContent = translateHTML(page.content, page.id);
 
   return (
-    <article className="faq-article">
+    <article className="wiki-article">
       <h1 className="article-title">{translatedTitle}</h1>
       <div className="article-meta">
         <span className="publish-date">{page.publishDate}</span>

@@ -1,4 +1,4 @@
-.binance-faq {
+.onfa-wiki {
   min-height: 100vh;
   background-color: #181a20;
   color: #eaecef;
@@ -43,7 +43,7 @@
   height: 16px;
 }
 
-.faq-container {
+.wiki-container {
   display: flex;
   max-width: 1400px;
   margin: 0 auto;
@@ -52,7 +52,7 @@
 }
 
 @media (max-width: 968px) {
-  .faq-container {
+  .wiki-container {
     padding: 0;
     gap: 0;
   }
@@ -515,7 +515,7 @@
   min-width: 0;
 }
 
-.faq-article {
+.wiki-article {
   background-color: #1e2026;
   border-radius: 8px;
   padding: 32px;
@@ -523,7 +523,7 @@
 }
 
 @media (max-width: 968px) {
-  .faq-article {
+  .wiki-article {
     background-color: transparent;
     border-radius: 0;
     padding: 30px 16px;
@@ -641,7 +641,7 @@
   text-shadow: 0 2px 4px rgba(255, 255, 255, 0.3);
 }
 
-.binance-logo {
+.onfa-logo {
   font-size: 18px;
   font-weight: 600;
   color: #181a20;
@@ -1049,7 +1049,7 @@
 }
 
 @media (max-width: 968px) {
-  .faq-container {
+  .wiki-container {
     flex-direction: column;
   }
   

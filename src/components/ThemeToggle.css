@@ -46,7 +46,7 @@
   --active-bg: rgba(240, 185, 11, 0.12);
 }
 
-[data-theme="light"] .binance-faq {
+[data-theme="light"] .onfa-wiki {
   background-color: #f8f9fa;
   color: var(--text-primary);
 }
@@ -151,7 +151,7 @@
   font-weight: 600;
 }
 
-[data-theme="light"] .faq-article {
+[data-theme="light"] .wiki-article {
   background-color: #ffffff;
   border-color: var(--border-color);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
