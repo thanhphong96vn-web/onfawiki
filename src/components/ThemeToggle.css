@@ -1,0 +1,299 @@
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: #eaecef;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.theme-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #f0b90b;
+}
+
+.theme-toggle:active {
+  transform: scale(0.95);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(15deg);
+}
+
+/* Light theme styles */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f3f5;
+  --text-primary: #1a1d29;
+  --text-secondary: #5e6673;
+  --text-tertiary: #848e9c;
+  --border-color: #e4e6eb;
+  --accent-color: #f0b90b;
+  --hover-bg: #f1f3f5;
+  --active-bg: rgba(240, 185, 11, 0.12);
+}
+
+[data-theme="light"] .binance-faq {
+  background-color: #f8f9fa;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .main-header {
+  background-color: #ffffff;
+  border-bottom-color: var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .header-nav .nav-link {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .header-nav .nav-link:hover {
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .sidebar-left {
+  background-color: transparent;
+}
+
+[data-theme="light"] .sidebar-nav {
+  background-color: #ffffff;
+  border-color: var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .nav-section {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="light"] .nav-children {
+  background-color: #f8f9fa;
+  border-top-color: var(--border-color);
+}
+
+[data-theme="light"] .nav-back-button {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="light"] .nav-back-button:hover {
+  background-color: var(--hover-bg);
+}
+
+[data-theme="light"] .nav-parent {
+  background-color: #ededed;
+  color: #000000;
+}
+
+[data-theme="light"] .nav-parent-text {
+  color: #000000 !important;
+}
+
+[data-theme="light"] .nav-parent-content {
+  color: #000000;
+}
+
+[data-theme="light"] .nav-child {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .nav-parent.expanded {
+  background-color: #ededed;
+  color: #000000;
+}
+
+[data-theme="light"] .nav-parent.expanded .nav-parent-text {
+  color: #000000 !important;
+}
+
+[data-theme="light"] .nav-parent.expanded .nav-parent-content {
+  color: #000000;
+}
+
+[data-theme="light"] .nav-arrow {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .nav-parent:hover {
+  background-color: #e0e0e0;
+  color: #000000;
+}
+
+[data-theme="light"] .nav-parent:hover .nav-parent-text {
+  color: #000000 !important;
+}
+
+[data-theme="light"] .nav-parent:hover .nav-parent-content {
+  color: #000000;
+}
+
+[data-theme="light"] .nav-child:hover {
+  background-color: var(--hover-bg);
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .nav-child.active {
+  background-color: var(--active-bg);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+[data-theme="light"] .faq-article {
+  background-color: #ffffff;
+  border-color: var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .article-title {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .article-content {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .article-content h1,
+[data-theme="light"] .article-content h2,
+[data-theme="light"] .article-content h3 {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+[data-theme="light"] .article-content a {
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .article-content code {
+  background-color: var(--hover-bg);
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .article-content pre {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="light"] .article-content blockquote {
+  border-left-color: var(--accent-color);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .publish-date {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .search-input {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .search-input:focus {
+  background-color: #ffffff;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(240, 185, 11, 0.1);
+}
+
+[data-theme="light"] .header-btn {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .header-btn.login-btn {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+[data-theme="light"] .header-btn.login-btn:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .header-btn.register-btn {
+  background-color: var(--accent-color);
+  color: #181a20;
+}
+
+[data-theme="light"] .header-btn.register-btn:hover {
+  background-color: #f8d33a;
+}
+
+[data-theme="light"] .theme-toggle {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .right-section {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .share-button {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .share-button:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .promo-box {
+  background-color: #ffffff;
+  border-color: var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .promo-title {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .promo-subtitle {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .related-articles {
+  background-color: #ffffff;
+  border-color: var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .related-title {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .related-link {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .related-link:hover {
+  color: var(--accent-color);
+}
+
+[data-theme="light"] .header-icon-btn {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .header-icon-btn:hover {
+  background-color: var(--hover-bg);
+  color: var(--accent-color);
+}
+
