@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getMenus, getPages, getPageById, loadDataFromJSON, clearCache } from './utils/dataService';
+import { getMenus, getPages, loadDataFromJSON } from './utils/dataService';
 import { useLanguage } from './contexts/LanguageContext';
 import PageContent from './components/PageContent';
 import AdminDashboard from './components/AdminDashboard';
@@ -77,14 +77,14 @@ function App() {
         setShowAdmin(false);
         
         if (hash) {
-          // Luôn tìm page từ dataService để đảm bảo có data mới nhất
-          const page = getPageById(hash);
+          // Tìm page từ state pages đã được load
+          const page = pages.find(p => p.id === hash);
           if (page) {
             // Chỉ update nếu hash khác với activePageId hiện tại để tránh re-render không cần thiết
             setActivePageId(prevId => prevId === hash ? prevId : hash);
           } else {
             // Nếu không tìm thấy page, thử tìm với raw hash (không decode)
-            const pageWithRawHash = getPageById(rawHash);
+            const pageWithRawHash = pages.find(p => p.id === rawHash);
             if (pageWithRawHash) {
               setActivePageId(rawHash);
             } else {
@@ -94,7 +94,7 @@ function App() {
           }
         } else {
           // Nếu không có hash, load page đầu tiên
-          const firstPage = getPages()[0];
+          const firstPage = pages[0];
           if (firstPage) {
             setActivePageId(firstPage.id);
             window.location.hash = encodeURIComponent(firstPage.id);
@@ -114,15 +114,16 @@ function App() {
     
     window.addEventListener('hashchange', handleHashChange);
     
-    // Load dữ liệu từ JSON file trước, sau đó load vào state
+    // Load dữ liệu từ database (100% từ API)
     loadDataFromJSON().then(() => {
       if (isMounted) {
         loadData();
         // Load từ URL hash ban đầu
         updateFromHash();
       }
-    }).catch(() => {
-      // Nếu không load được từ JSON, vẫn load từ localStorage
+    }).catch((error) => {
+      console.error('Error loading data:', error);
+      // Nếu không load được, vẫn load để hiển thị default data
       if (isMounted) {
         loadData();
         updateFromHash();
@@ -135,13 +136,21 @@ function App() {
     };
   }, []);
 
-  const loadData = () => {
-    const menusData = getMenus();
-    const pagesData = getPages();
-    console.log('Loading data - Menus:', menusData.length, 'Pages:', pagesData.length);
-    setMenus(menusData);
-    setPages(pagesData);
-    setFilteredMenus(menusData);
+  const loadData = async () => {
+    try {
+      const menusData = await getMenus();
+      const pagesData = await getPages();
+      console.log('Loading data - Menus:', menusData.length, 'Pages:', pagesData.length);
+      setMenus(menusData);
+      setPages(pagesData);
+      setFilteredMenus(menusData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      // Set empty arrays nếu không load được
+      setMenus([]);
+      setPages([]);
+      setFilteredMenus([]);
+    }
   };
 
   // Sidebar search functionality
@@ -229,8 +238,8 @@ function App() {
       toggleMenu(menuId);
       return; // Dừng lại, không load page
     } else {
-      // Nếu là menu đơn, load page
-      const page = getPageById(menuId);
+      // Nếu là menu đơn, load page từ state
+      const page = pages.find(p => p.id === menuId);
       if (page) {
         // Đánh dấu là đang navigate từ click
         isNavigatingFromClick.current = true;
@@ -247,7 +256,7 @@ function App() {
 
   const handleChildClick = (childId, e) => {
     e.stopPropagation();
-    const page = getPageById(childId);
+    const page = pages.find(p => p.id === childId);
     if (page) {
       // Đánh dấu là đang navigate từ click
       isNavigatingFromClick.current = true;
@@ -261,15 +270,13 @@ function App() {
     }
   };
 
-  const handleDataChange = () => {
+  const handleDataChange = async () => {
     // Nếu đang ở admin dashboard, giữ nguyên hash #admin và không redirect
     const currentHash = window.location.hash;
     const isInAdmin = currentHash === '#admin';
     
-    // Clear cache to force reload from localStorage
-    clearCache();
-    // Force reload data from localStorage
-    loadData();
+    // Force reload data from database
+    await loadData();
     
     // Nếu đang ở admin, không thay đổi hash hoặc activePageId
     if (isInAdmin) {
@@ -282,10 +289,10 @@ function App() {
     
     // Reload active page if it still exists (chỉ khi không ở admin)
     if (activePageId) {
-      const page = getPageById(activePageId);
+      const page = pages.find(p => p.id === activePageId);
       if (!page) {
         // If page was deleted, load first available page
-        const firstPage = getPages()[0];
+        const firstPage = pages[0];
         if (firstPage) {
           setActivePageId(firstPage.id);
           window.location.hash = encodeURIComponent(firstPage.id);
@@ -302,7 +309,7 @@ function App() {
       }
     } else {
       // If no active page, load first available page
-      const firstPage = getPages()[0];
+      const firstPage = pages[0];
       if (firstPage) {
         setActivePageId(firstPage.id);
         window.location.hash = encodeURIComponent(firstPage.id);
@@ -310,13 +317,12 @@ function App() {
     }
   };
 
-  const handleCloseAdmin = () => {
+  const handleCloseAdmin = async () => {
     setShowAdmin(false);
     // Reload data khi quay về từ admin
-    clearCache();
-    loadData();
+    await loadData();
     // Quay về trang đầu tiên hoặc trang trước đó
-    const firstPage = getPages()[0];
+    const firstPage = pages[0];
     if (firstPage) {
       setActivePageId(firstPage.id);
       window.location.hash = encodeURIComponent(firstPage.id);
@@ -326,7 +332,7 @@ function App() {
     }
   };
 
-  const activePage = activePageId ? getPageById(activePageId) : null;
+  const activePage = activePageId ? pages.find(p => p.id === activePageId) : null;
 
   const handleAdminLoginSuccess = () => {
     setIsAdminAuthenticated(true);

@@ -1,7 +1,4 @@
-// Data service để quản lý pages và menu với MongoDB và localStorage
-
-const STORAGE_KEY = 'wiki_pages_data';
-const JSON_DATA_URL = '/data/wiki-data.json';
+// Data service để quản lý pages và menu với MongoDB (100% từ database)
 
 // API base URL - tự động detect environment
 const getApiBaseUrl = () => {
@@ -13,13 +10,9 @@ const getApiBaseUrl = () => {
   return 'http://localhost:3001/api';
 };
 
-// Cache cho dữ liệu đã load
-let cachedData = null;
-let isLoading = false;
-
-// Function to clear cache (useful when data is updated)
+// Function to clear cache (không còn dùng nữa nhưng giữ lại để tương thích)
 export const clearCache = () => {
-  cachedData = null;
+  // Không làm gì vì không còn cache
 };
 
 // Cấu trúc dữ liệu mặc định
@@ -112,199 +105,66 @@ const defaultData = {
   ]
 };
 
-// Load dữ liệu từ API/Database (async)
+// Load dữ liệu từ API/Database (100% từ database, không cache)
 export const loadDataFromJSON = async () => {
-  // Nếu đã có cache, kiểm tra localStorage trước
-  if (cachedData) {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const localData = JSON.parse(stored);
-        // Ưu tiên localStorage nếu có
-        cachedData = localData;
-        return cachedData;
-      } catch (e) {
-        // Nếu localStorage lỗi, dùng cache hiện tại
-        return cachedData;
-      }
-    }
-    return cachedData;
-  }
-
-  // Kiểm tra localStorage trước khi load từ API
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      cachedData = JSON.parse(stored);
-      return cachedData;
-    }
-  } catch (e) {
-    console.error('Error loading from localStorage:', e);
-  }
-
-  if (isLoading) {
-    // Đợi nếu đang load
-    return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (cachedData) {
-          clearInterval(checkInterval);
-          resolve(cachedData);
-        }
-      }, 100);
-    });
-  }
-
-  isLoading = true;
-  try {
-    // Ưu tiên load từ API (MongoDB)
+    // Luôn load từ API (MongoDB)
     const apiUrl = getApiBaseUrl();
     const response = await fetch(`${apiUrl}/get-data`);
     
     if (response.ok) {
       const data = await response.json();
-      // Lưu vào localStorage và cache
-      cachedData = data;
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (e) {
-        console.warn('Could not save to localStorage:', e);
-      }
-      isLoading = false;
-      return cachedData;
+      return data;
     } else {
-      throw new Error('Failed to load from API');
+      throw new Error(`Failed to load from API: ${response.status}`);
     }
   } catch (apiError) {
-    console.warn('Error loading from API, trying JSON file:', apiError);
-    
-    // Fallback về JSON file nếu API không khả dụng
-    try {
-      const response = await fetch(JSON_DATA_URL);
-      if (response.ok) {
-        const data = await response.json();
-        cachedData = data;
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } catch (e) {
-          console.warn('Could not save to localStorage:', e);
-        }
-        isLoading = false;
-        return cachedData;
-      }
-    } catch (jsonError) {
-      console.warn('Error loading from JSON file:', jsonError);
-    }
-    
-    // Fallback về localStorage
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        cachedData = JSON.parse(stored);
-        isLoading = false;
-        return cachedData;
-      }
-    } catch (e) {
-      console.error('Error loading from localStorage:', e);
-    }
-    
-    // Cuối cùng dùng default data
-    cachedData = defaultData;
-    isLoading = false;
+    console.error('Error loading from API:', apiError);
+    // Nếu API không khả dụng, trả về default data
     return defaultData;
   }
 };
 
-// Lấy dữ liệu (sync - từ cache hoặc localStorage)
+// Lấy dữ liệu (sync - từ API, nhưng trả về default nếu chưa load xong)
+// Lưu ý: Hàm này chỉ nên dùng khi cần sync, tốt nhất là dùng loadDataFromJSON() async
 export const getData = () => {
-  // Luôn ưu tiên đọc từ localStorage để có dữ liệu mới nhất
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const data = JSON.parse(stored);
-      cachedData = data;
-      return data;
-    }
-  } catch (error) {
-    console.error('Error loading data from localStorage:', error);
-  }
-
-  // Nếu đã có cache, trả về cache
-  if (cachedData) {
-    return cachedData;
-  }
-
-  // Nếu localStorage trống, thử load từ JSON file đồng bộ (chỉ trong browser)
-  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-    try {
-      // Sử dụng XMLHttpRequest để load đồng bộ (không khuyến khích nhưng cần thiết ở đây)
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', JSON_DATA_URL, false); // false = synchronous
-      xhr.send();
-      
-      if (xhr.status === 200) {
-        const data = JSON.parse(xhr.responseText);
-        cachedData = data;
-        // Lưu vào localStorage để lần sau không cần load lại
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          console.log('Data loaded from JSON file and saved to localStorage');
-        } catch (e) {
-          console.warn('Could not save to localStorage:', e);
-        }
-        return data;
-      }
-    } catch (error) {
-      console.warn('Could not load from JSON file synchronously:', error);
-    }
-  }
-
-  // Nếu chưa có, trả về default và trigger load từ JSON async
-  cachedData = defaultData;
-  // Load từ JSON file trong background
-  loadDataFromJSON().catch(err => console.error('Error loading JSON:', err));
-  
-  return cachedData;
+  // Trả về default data, component nên dùng loadDataFromJSON() để load từ API
+  return defaultData;
 };
 
-// Lưu dữ liệu vào localStorage, cache và database (qua API)
-export const saveData = (data) => {
+// Lưu dữ liệu vào database (100% qua API, không dùng localStorage)
+export const saveData = async (data) => {
   try {
-    cachedData = data;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    console.log('✅ Data saved to localStorage');
-    
-    // Gọi API để lưu vào database (fire-and-forget, không block)
     const apiUrl = getApiBaseUrl();
-    fetch(`${apiUrl}/save-data`, {
+    const response = await fetch(`${apiUrl}/save-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data)
-    }).then(response => {
-      if (response.ok) {
-        console.log('✅ Data saved to database successfully');
-        // Trigger custom event để UI có thể hiển thị thông báo
-        window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: true } }));
-      } else {
-        console.warn('⚠️ Failed to save to database, but data saved to localStorage');
-        window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: false, error: 'Server error' } }));
-      }
-    }).catch(apiError => {
-      // Nếu API không khả dụng (server chưa chạy), chỉ lưu vào localStorage
-      console.warn('⚠️ API server not available, data saved to localStorage only:', apiError.message);
-      window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: false, error: 'Server not running' } }));
     });
+    
+    if (response.ok) {
+      console.log('✅ Data saved to database successfully');
+      // Trigger custom event để UI có thể hiển thị thông báo
+      window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: true } }));
+      return { success: true };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Server error');
+    }
   } catch (error) {
-    console.error('❌ Error saving data:', error);
+    console.error('❌ Error saving data to database:', error);
+    window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: false, error: error.message } }));
     throw error;
   }
 };
 
-// Hàm để sync data vào database (có thể gọi thủ công)
+// Hàm để sync data vào database (load từ API rồi save lại)
 export const syncDataToJSON = async () => {
   try {
-    const data = getData();
+    // Load data từ API trước
+    const data = await loadDataFromJSON();
     const apiUrl = getApiBaseUrl();
     const response = await fetch(`${apiUrl}/save-data`, {
       method: 'POST',
@@ -345,17 +205,17 @@ export const exportDataToJSON = () => {
   URL.revokeObjectURL(url);
 };
 
-// Import dữ liệu từ file JSON
-export const importDataFromJSON = (file) => {
+// Import dữ liệu từ file JSON và lưu vào database
+export const importDataFromJSON = async (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
         // Validate data structure
         if (data.menus && data.pages) {
-          cachedData = data;
-          saveData(data);
+          // Lưu vào database
+          await saveData(data);
           resolve(data);
         } else {
           reject(new Error('Invalid data format'));
@@ -369,9 +229,9 @@ export const importDataFromJSON = (file) => {
   });
 };
 
-// Lấy tất cả menus (bao gồm cả các trang không có menu cha)
-export const getMenus = () => {
-  const data = getData();
+// Lấy tất cả menus (bao gồm cả các trang không có menu cha) - async từ API
+export const getMenus = async () => {
+  const data = await loadDataFromJSON();
   const menus = data.menus || [];
   const pages = data.pages || [];
   
@@ -393,21 +253,21 @@ export const getMenus = () => {
   return [...menus, ...autoMenus];
 };
 
-// Lấy tất cả pages
-export const getPages = () => {
-  const data = getData();
+// Lấy tất cả pages - async từ API
+export const getPages = async () => {
+  const data = await loadDataFromJSON();
   return data.pages || [];
 };
 
-// Lấy page theo ID
-export const getPageById = (id) => {
-  const pages = getPages();
+// Lấy page theo ID - async từ API
+export const getPageById = async (id) => {
+  const pages = await getPages();
   return pages.find(page => page.id === id);
 };
 
-// Tạo page mới
-export const createPage = (pageData) => {
-  const data = getData();
+// Tạo page mới - async từ API
+export const createPage = async (pageData) => {
+  const data = await loadDataFromJSON();
   const newPage = {
     id: pageData.id || `page-${Date.now()}`,
     title: pageData.title,
@@ -440,13 +300,13 @@ export const createPage = (pageData) => {
     }
   }
   
-  saveData(data);
+  await saveData(data);
   return newPage;
 };
 
-// Cập nhật page
-export const updatePage = (id, pageData) => {
-  const data = getData();
+// Cập nhật page - async từ API
+export const updatePage = async (id, pageData) => {
+  const data = await loadDataFromJSON();
   const pageIndex = data.pages.findIndex(p => p.id === id);
   
   if (pageIndex === -1) return null;
@@ -491,13 +351,13 @@ export const updatePage = (id, pageData) => {
     }
   }
   
-  saveData(data);
+  await saveData(data);
   return data.pages[pageIndex];
 };
 
-// Xóa page
-export const deletePage = (id) => {
-  const data = getData();
+// Xóa page - async từ API
+export const deletePage = async (id) => {
+  const data = await loadDataFromJSON();
   const page = data.pages.find(p => p.id === id);
   
   if (!page) return false;
@@ -519,13 +379,13 @@ export const deletePage = (id) => {
     }
   }
   
-  saveData(data);
+  await saveData(data);
   return true;
 };
 
-// Tạo menu mới
-export const createMenu = (menuData) => {
-  const data = getData();
+// Tạo menu mới - async từ API
+export const createMenu = async (menuData) => {
+  const data = await loadDataFromJSON();
   const newMenu = {
     id: menuData.id || `menu-${Date.now()}`,
     title: menuData.title,
@@ -535,13 +395,13 @@ export const createMenu = (menuData) => {
   };
   
   data.menus.push(newMenu);
-  saveData(data);
+  await saveData(data);
   return newMenu;
 };
 
-// Cập nhật menu
-export const updateMenu = (id, menuData) => {
-  const data = getData();
+// Cập nhật menu - async từ API
+export const updateMenu = async (id, menuData) => {
+  const data = await loadDataFromJSON();
   const menuIndex = data.menus.findIndex(m => m.id === id);
   
   if (menuIndex === -1) return null;
@@ -552,13 +412,13 @@ export const updateMenu = (id, menuData) => {
     id
   };
   
-  saveData(data);
+  await saveData(data);
   return data.menus[menuIndex];
 };
 
-// Xóa menu
-export const deleteMenu = (id) => {
-  const data = getData();
+// Xóa menu - async từ API
+export const deleteMenu = async (id) => {
+  const data = await loadDataFromJSON();
   
   // Xóa tất cả pages liên quan
   const pagesToDelete = data.pages.filter(p => p.parentId === id || p.id === id);
@@ -569,7 +429,7 @@ export const deleteMenu = (id) => {
   // Xóa menu
   data.menus = data.menus.filter(m => m.id !== id);
   
-  saveData(data);
+  await saveData(data);
   return true;
 };
 

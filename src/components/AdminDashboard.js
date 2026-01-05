@@ -30,23 +30,14 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
   const listSectionRef = useRef(null);
 
   useEffect(() => {
-    // Load dữ liệu từ localStorage (ưu tiên) hoặc JSON file
+    // Load dữ liệu từ database (100% từ API)
     loadData();
-    // Chỉ load từ JSON nếu localStorage trống
-    const stored = localStorage.getItem('wiki_pages_data');
-    if (!stored) {
-      loadDataFromJSON().then(() => {
-        loadData();
-      }).catch(() => {
-        loadData();
-      });
-    }
 
-    // Listen for data saved events để tự động sync
+    // Listen for data saved events để tự động reload
     const handleDataSaved = async (event) => {
-      if (event.detail && event.detail.success === false) {
-        // Nếu sync thất bại, không làm gì (user có thể sync thủ công)
-        console.log('Auto-sync failed, user can sync manually');
+      if (event.detail && event.detail.success === true) {
+        // Reload data sau khi save thành công
+        await loadData();
       }
     };
 
@@ -80,101 +71,87 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
   }, [pages, menus, activeTab]);
 
 
-  const loadData = () => {
-    const menusData = getMenus();
-    const pagesData = getPages();
-    console.log('AdminDashboard loadData - Menus:', menusData.length, menusData);
-    console.log('AdminDashboard loadData - Parent menus:', menusData.filter(m => m.type === 'parent'));
-    setMenus(menusData);
-    setPages(pagesData);
+  const loadData = async () => {
+    try {
+      const menusData = await getMenus();
+      const pagesData = await getPages();
+      console.log('AdminDashboard loadData - Menus:', menusData.length, menusData);
+      console.log('AdminDashboard loadData - Parent menus:', menusData.filter(m => m.type === 'parent'));
+      setMenus(menusData);
+      setPages(pagesData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      // Set empty arrays nếu không load được
+      setMenus([]);
+      setPages([]);
+    }
   };
 
-  const handlePageSubmit = (e) => {
+  const handlePageSubmit = async (e) => {
     e.preventDefault();
     
-    if (editingPage) {
-      updatePage(editingPage.id, {
-        title: formData.title,
-        content: formData.content,
-        publishDate: formData.publishDate,
-        parentId: formData.parentId || null
-      });
-    } else {
-      createPage({
-        id: formData.title.toLowerCase().replace(/\s+/g, '-'),
-        title: formData.title,
-        content: formData.content,
-        publishDate: formData.publishDate,
-        parentId: formData.parentId || null
-      });
-    }
-    
-    resetForm();
-    clearCache(); // Clear cache to force reload
-    loadData();
-    
-    // Tự động sync vào JSON file sau khi save
-    setTimeout(async () => {
-      try {
-        await syncDataToJSON();
-        console.log('✅ Auto-synced to JSON file after page save');
-      } catch (error) {
-        console.warn('⚠️ Auto-sync failed (server may not be running):', error.message);
+    try {
+      if (editingPage) {
+        await updatePage(editingPage.id, {
+          title: formData.title,
+          content: formData.content,
+          publishDate: formData.publishDate,
+          parentId: formData.parentId || null
+        });
+      } else {
+        await createPage({
+          id: formData.title.toLowerCase().replace(/\s+/g, '-'),
+          title: formData.title,
+          content: formData.content,
+          publishDate: formData.publishDate,
+          parentId: formData.parentId || null
+        });
       }
-    }, 200);
-    
-    if (onDataChange) {
-      // Delay to ensure data is saved
-      setTimeout(() => {
-        onDataChange();
-      }, 100);
-    }
-  };
-
-  const handleMenuSubmit = (e) => {
-    e.preventDefault();
-    
-    const menuData = {
-      title: formData.menuTitle,
-      icon: formData.menuIcon,
-      type: formData.menuType
-    };
-    
-    console.log('Creating/Updating menu with data:', menuData);
-    
-    if (editingMenu) {
-      updateMenu(editingMenu.id, menuData);
-    } else {
-      createMenu({
-        id: formData.menuTitle.toLowerCase().replace(/\s+/g, '-'),
-        ...menuData,
-        children: []
-      });
-    }
-    
-    resetForm();
-    clearCache(); // Clear cache to force reload
-    // Delay để đảm bảo data đã được lưu vào localStorage
-    setTimeout(() => {
-      loadData();
-      const allMenus = getMenus();
-      console.log('Menus after create/update:', allMenus);
-      console.log('Parent menus:', allMenus.filter(m => m.type === 'parent'));
       
-      // Tự động sync vào JSON file sau khi save
-      setTimeout(async () => {
-        try {
-          await syncDataToJSON();
-          console.log('✅ Auto-synced to JSON file after menu save');
-        } catch (error) {
-          console.warn('⚠️ Auto-sync failed (server may not be running):', error.message);
-        }
-      }, 200);
+      resetForm();
+      await loadData();
       
       if (onDataChange) {
         onDataChange();
       }
-    }, 200);
+    } catch (error) {
+      console.error('Error saving page:', error);
+      alert('❌ Lỗi khi lưu trang: ' + error.message);
+    }
+  };
+
+  const handleMenuSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const menuData = {
+        title: formData.menuTitle,
+        icon: formData.menuIcon,
+        type: formData.menuType
+      };
+      
+      console.log('Creating/Updating menu with data:', menuData);
+      
+      if (editingMenu) {
+        await updateMenu(editingMenu.id, menuData);
+      } else {
+        await createMenu({
+          id: formData.menuTitle.toLowerCase().replace(/\s+/g, '-'),
+          ...menuData,
+          children: []
+        });
+      }
+      
+      resetForm();
+      await loadData();
+      
+      if (onDataChange) {
+        onDataChange();
+      }
+    } catch (error) {
+      console.error('Error saving menu:', error);
+      alert('❌ Lỗi khi lưu menu: ' + error.message);
+    }
   };
 
   const handleEditPage = (page) => {
