@@ -24,7 +24,17 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const client = await clientPromise;
+    let client;
+    try {
+      client = await clientPromise;
+    } catch (connectionError) {
+      console.error('MongoDB connection error:', connectionError);
+      return res.status(500).json({ 
+        error: 'Database connection failed', 
+        details: connectionError.message 
+      });
+    }
+
     const db = client.db('onfawiki');
     const collection = db.collection('wikiData');
 

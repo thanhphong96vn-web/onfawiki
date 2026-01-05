@@ -242,7 +242,7 @@ function App() {
     });
   };
 
-  const handleMenuClick = (menuId, e) => {
+  const handleMenuClick = async (menuId, e) => {
     // Nếu là menu cha, chỉ toggle expand và không load page
     const menu = menus.find(m => m.id === menuId);
     if (menu && menu.type === 'parent') {
@@ -251,8 +251,23 @@ function App() {
       toggleMenu(menuId);
       return; // Dừng lại, không load page
     } else {
-      // Nếu là menu đơn, load page từ state
-      const page = pages.find(p => p.id === menuId);
+      // Nếu là menu đơn, load page từ state hoặc từ API nếu chưa có
+      let page = pages.find(p => p.id === menuId);
+      
+      // Nếu không tìm thấy trong state, thử load từ API
+      if (!page) {
+        try {
+          const { getPageById } = await import('./utils/dataService');
+          page = await getPageById(menuId);
+          // Nếu tìm thấy, reload data để cập nhật state
+          if (page) {
+            await loadData();
+          }
+        } catch (error) {
+          console.error('Error loading page:', error);
+        }
+      }
+      
       if (page) {
         // Đánh dấu là đang navigate từ click
         isNavigatingFromClick.current = true;
@@ -263,13 +278,30 @@ function App() {
         setTimeout(() => {
           isNavigatingFromClick.current = false;
         }, 100);
+      } else {
+        console.warn('Page not found:', menuId);
       }
     }
   };
 
-  const handleChildClick = (childId, e) => {
+  const handleChildClick = async (childId, e) => {
     e.stopPropagation();
-    const page = pages.find(p => p.id === childId);
+    let page = pages.find(p => p.id === childId);
+    
+    // Nếu không tìm thấy trong state, thử load từ API
+    if (!page) {
+      try {
+        const { getPageById } = await import('./utils/dataService');
+        page = await getPageById(childId);
+        // Nếu tìm thấy, reload data để cập nhật state
+        if (page) {
+          await loadData();
+        }
+      } catch (error) {
+        console.error('Error loading page:', error);
+      }
+    }
+    
     if (page) {
       // Đánh dấu là đang navigate từ click
       isNavigatingFromClick.current = true;
@@ -280,6 +312,8 @@ function App() {
       setTimeout(() => {
         isNavigatingFromClick.current = false;
       }, 100);
+    } else {
+      console.warn('Page not found:', childId);
     }
   };
 
@@ -571,7 +605,7 @@ function App() {
                   ) : (
                     <div 
                       className={`nav-item ${activePageId === menu.id ? 'active' : ''}`}
-                      onClick={() => handleMenuClick(menu.id)}
+                      onClick={(e) => handleMenuClick(menu.id, e)}
                     >
                       <MenuIcon type={menu.icon} />
                       <span>{translate(`menu_${menu.id}`, menu.title)}</span>
