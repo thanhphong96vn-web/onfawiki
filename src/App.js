@@ -70,8 +70,7 @@ function App() {
       } else {
         // Nếu có hash khác hoặc không có hash, tắt admin và load page
         if (wasInAdmin) {
-          // Nếu đang ở admin và chuyển về trang chính, reload data
-          clearCache();
+          // Nếu đang ở admin và chuyển về trang chính, reload data từ database
           loadData();
         }
         setShowAdmin(false);
