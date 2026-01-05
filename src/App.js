@@ -114,20 +114,34 @@ function App() {
     window.addEventListener('hashchange', handleHashChange);
     
     // Load dữ liệu từ database (100% từ API)
-    loadDataFromJSON().then(() => {
-      if (isMounted) {
-        loadData();
-        // Load từ URL hash ban đầu
-        updateFromHash();
+    const initData = async () => {
+      try {
+        console.log('Initializing data load...');
+        await loadData();
+        if (isMounted) {
+          console.log('Data loaded, updating hash...');
+          // Load từ URL hash ban đầu sau khi data đã load
+          updateFromHash();
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Nếu không load được, thử load lại một lần nữa
+        if (isMounted) {
+          try {
+            await loadData();
+            updateFromHash();
+          } catch (retryError) {
+            console.error('Retry failed:', retryError);
+            // Nếu vẫn fail, set empty để UI hiển thị thông báo
+            setMenus([]);
+            setPages([]);
+            setFilteredMenus([]);
+          }
+        }
       }
-    }).catch((error) => {
-      console.error('Error loading data:', error);
-      // Nếu không load được, vẫn load để hiển thị default data
-      if (isMounted) {
-        loadData();
-        updateFromHash();
-      }
-    });
+    };
+    
+    initData();
     
     return () => {
       isMounted = false;

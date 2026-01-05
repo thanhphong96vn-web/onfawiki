@@ -2,11 +2,28 @@
 const clientPromise = require('../lib/mongodb');
 
 module.exports = async function handler(req, res) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI is not set');
+      return res.status(500).json({ 
+        error: 'Database not configured', 
+        details: 'MONGODB_URI environment variable is missing' 
+      });
+    }
+
     const client = await clientPromise;
     const db = client.db('onfawiki');
     const collection = db.collection('wikiData');
@@ -30,7 +47,11 @@ module.exports = async function handler(req, res) {
     res.status(200).json(result);
   } catch (error) {
     console.error('Error fetching data:', error);
-    res.status(500).json({ error: 'Failed to fetch data', details: error.message });
+    res.status(500).json({ 
+      error: 'Failed to fetch data', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
 

@@ -110,17 +110,27 @@ export const loadDataFromJSON = async () => {
   try {
     // Luôn load từ API (MongoDB)
     const apiUrl = getApiBaseUrl();
-    const response = await fetch(`${apiUrl}/get-data`);
+    console.log('Loading data from API:', `${apiUrl}/get-data`);
+    const response = await fetch(`${apiUrl}/get-data`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     
     if (response.ok) {
       const data = await response.json();
+      console.log('Data loaded from API:', data);
       return data;
     } else {
-      throw new Error(`Failed to load from API: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API response error:', response.status, errorText);
+      throw new Error(`Failed to load from API: ${response.status} - ${errorText}`);
     }
   } catch (apiError) {
     console.error('Error loading from API:', apiError);
     // Nếu API không khả dụng, trả về default data
+    console.warn('Using default data due to API error');
     return defaultData;
   }
 };
