@@ -10,6 +10,10 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
   const [activeTab, setActiveTab] = useState('pages');
   const [editingPage, setEditingPage] = useState(null);
   const [editingMenu, setEditingMenu] = useState(null);
+  const [pagesCurrentPage, setPagesCurrentPage] = useState(1);
+  const [menusCurrentPage, setMenusCurrentPage] = useState(1);
+  const pagesPerPage = 8;
+  const menusPerPage = 5;
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -22,6 +26,8 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
 
   const fileInputRef = useRef(null);
   const iconFileInputRef = useRef(null);
+  const formSectionRef = useRef(null);
+  const listSectionRef = useRef(null);
 
   useEffect(() => {
     // Load dữ liệu từ localStorage (ưu tiên) hoặc JSON file
@@ -50,6 +56,29 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
       window.removeEventListener('dataSavedToJSON', handleDataSaved);
     };
   }, []);
+
+  // Đồng bộ chiều cao giữa form section và list section
+  useEffect(() => {
+    const syncHeights = () => {
+      if (formSectionRef.current && listSectionRef.current) {
+        const formHeight = formSectionRef.current.offsetHeight;
+        listSectionRef.current.style.height = `${formHeight}px`;
+      }
+    };
+
+    // Sync ngay lập tức
+    syncHeights();
+
+    // Sync khi resize hoặc khi data thay đổi
+    window.addEventListener('resize', syncHeights);
+    const interval = setInterval(syncHeights, 100);
+
+    return () => {
+      window.removeEventListener('resize', syncHeights);
+      clearInterval(interval);
+    };
+  }, [pages, menus, activeTab]);
+
 
   const loadData = () => {
     const menusData = getMenus();
@@ -180,6 +209,13 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
     if (window.confirm('Bạn có chắc muốn xóa trang này?')) {
       deletePage(id);
       loadData();
+      // Điều chỉnh pagination nếu trang hiện tại trở thành trống
+      setTimeout(() => {
+        const newTotalPages = Math.ceil((pages.length - 1) / pagesPerPage);
+        if (pagesCurrentPage > newTotalPages && newTotalPages > 0) {
+          setPagesCurrentPage(newTotalPages);
+        }
+      }, 100);
       if (onDataChange) onDataChange();
     }
   };
@@ -188,6 +224,13 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
     if (window.confirm('Bạn có chắc muốn xóa menu này? Tất cả các trang con sẽ bị xóa.')) {
       deleteMenu(id);
       loadData();
+      // Điều chỉnh pagination nếu trang hiện tại trở thành trống
+      setTimeout(() => {
+        const newTotalPages = Math.ceil((menus.length - 1) / menusPerPage);
+        if (menusCurrentPage > newTotalPages && newTotalPages > 0) {
+          setMenusCurrentPage(newTotalPages);
+        }
+      }, 100);
       if (onDataChange) onDataChange();
     }
   };
@@ -213,6 +256,24 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
     return filtered;
   }, [menus]);
 
+  // Tính toán pagination cho pages
+  const pagesTotalPages = Math.ceil(pages.length / pagesPerPage);
+  const pagesStartIndex = (pagesCurrentPage - 1) * pagesPerPage;
+  const pagesEndIndex = pagesStartIndex + pagesPerPage;
+  const paginatedPages = pages.slice(pagesStartIndex, pagesEndIndex);
+
+  // Tính toán pagination cho menus
+  const menusTotalPages = Math.ceil(menus.length / menusPerPage);
+  const menusStartIndex = (menusCurrentPage - 1) * menusPerPage;
+  const menusEndIndex = menusStartIndex + menusPerPage;
+  const paginatedMenus = menus.slice(menusStartIndex, menusEndIndex);
+
+  // Reset về trang 1 khi chuyển tab hoặc khi data thay đổi
+  useEffect(() => {
+    setPagesCurrentPage(1);
+    setMenusCurrentPage(1);
+  }, [activeTab]);
+
   return (
     <div className="admin-dashboard">
       <div className="admin-header">
@@ -220,30 +281,6 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
           <img src="/logo-onfa-scaled.png" alt="ONFA" style={{ height: '40px', width: 'auto' }} />
         </a>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {onLogout && (
-            <button 
-              onClick={onLogout}
-              style={{ 
-                padding: '8px 16px', 
-                background: '#2b3139', 
-                color: '#eaecef', 
-                border: '1px solid #3a3f47', 
-                borderRadius: '6px', 
-                cursor: 'pointer',
-                fontWeight: '500',
-                fontSize: '14px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = '#3a3f47';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = '#2b3139';
-              }}
-            >
-              Đăng xuất
-            </button>
-          )}
           <button 
             className="export-btn" 
             onClick={async () => {
@@ -354,9 +391,30 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
               }
             }}
           />
-          <button className="close-admin" onClick={onClose || (() => window.location.hash = '')}>
-            Đóng Admin
-          </button>
+          {onLogout && (
+            <button 
+              onClick={onLogout}
+              style={{ 
+                padding: '8px 16px', 
+                background: '#2b3139', 
+                color: '#eaecef', 
+                border: '1px solid #3a3f47', 
+                borderRadius: '6px', 
+                cursor: 'pointer',
+                fontWeight: '500',
+                fontSize: '14px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#3a3f47';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = '#2b3139';
+              }}
+            >
+              Đăng xuất
+            </button>
+          )}
         </div>
       </div>
 
@@ -365,6 +423,7 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
           className={activeTab === 'pages' ? 'active' : ''}
           onClick={() => {
             setActiveTab('pages');
+            setPagesCurrentPage(1);
             // Reload data khi chuyển tab để đảm bảo menus được cập nhật
             loadData();
           }}
@@ -375,6 +434,7 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
           className={activeTab === 'menus' ? 'active' : ''}
           onClick={() => {
             setActiveTab('menus');
+            setMenusCurrentPage(1);
             // Reload data khi chuyển tab để đảm bảo menus được cập nhật
             loadData();
           }}
@@ -385,7 +445,7 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
 
       {activeTab === 'pages' && (
         <div className="admin-content">
-          <div className="admin-form-section">
+          <div className="admin-form-section" ref={formSectionRef}>
             <h2>{editingPage ? 'Sửa Trang' : 'Tạo Trang Mới'}</h2>
             <form onSubmit={handlePageSubmit}>
               <div className="form-group">
@@ -439,10 +499,10 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
             </form>
           </div>
 
-          <div className="admin-list-section">
+          <div className="admin-list-section" ref={listSectionRef}>
             <h2>Danh sách Trang ({pages.length})</h2>
             <div className="items-list">
-              {pages.map(page => (
+              {paginatedPages.map(page => (
                 <div key={page.id} className="item-card">
                   <div className="item-info">
                     <h3>{page.title}</h3>
@@ -457,14 +517,40 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
                   </div>
                 </div>
               ))}
+              {paginatedPages.length === 0 && (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#848e9c' }}>
+                  Không có trang nào
+                </div>
+              )}
             </div>
+            {pagesTotalPages > 1 && (
+              <div className="pagination">
+                <button
+                  onClick={() => setPagesCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={pagesCurrentPage === 1}
+                  className="pagination-btn"
+                >
+                  Trước
+                </button>
+                <span className="pagination-info">
+                  Trang {pagesCurrentPage} / {pagesTotalPages}
+                </span>
+                <button
+                  onClick={() => setPagesCurrentPage(prev => Math.min(pagesTotalPages, prev + 1))}
+                  disabled={pagesCurrentPage === pagesTotalPages}
+                  className="pagination-btn"
+                >
+                  Sau
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {activeTab === 'menus' && (
         <div className="admin-content">
-          <div className="admin-form-section">
+          <div className="admin-form-section" ref={formSectionRef}>
             <h2>{editingMenu ? 'Sửa Menu' : 'Tạo Menu Mới'}</h2>
             <form onSubmit={handleMenuSubmit}>
               <div className="form-group">
@@ -576,10 +662,10 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
             </form>
           </div>
 
-          <div className="admin-list-section">
+          <div className="admin-list-section" ref={listSectionRef}>
             <h2>Danh sách Menu ({menus.length})</h2>
             <div className="items-list">
-              {menus.map(menu => (
+              {paginatedMenus.map(menu => (
                 <div key={menu.id} className="item-card">
                   <div className="item-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -597,7 +683,33 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
                   </div>
                 </div>
               ))}
+              {paginatedMenus.length === 0 && (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#848e9c' }}>
+                  Không có menu nào
+                </div>
+              )}
             </div>
+            {menusTotalPages > 1 && (
+              <div className="pagination">
+                <button
+                  onClick={() => setMenusCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={menusCurrentPage === 1}
+                  className="pagination-btn"
+                >
+                  Trước
+                </button>
+                <span className="pagination-info">
+                  Trang {menusCurrentPage} / {menusTotalPages}
+                </span>
+                <button
+                  onClick={() => setMenusCurrentPage(prev => Math.min(menusTotalPages, prev + 1))}
+                  disabled={menusCurrentPage === menusTotalPages}
+                  className="pagination-btn"
+                >
+                  Sau
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

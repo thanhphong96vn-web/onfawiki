@@ -1,7 +1,7 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const { MongoClient } = require('mongodb');
 const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
 const PORT = 3001;
@@ -11,10 +11,32 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Tăng giới hạn để xử lý dữ liệu lớn
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const DATA_FILE = path.join(__dirname, 'public', 'data', 'wiki-data.json');
+// MongoDB connection
+let client;
+let db;
 
-// API endpoint để lưu data vào JSON file
-app.post('/api/save-data', (req, res) => {
+async function connectToMongoDB() {
+  if (!process.env.MONGODB_URI) {
+    console.error('MONGODB_URI is not set in environment variables');
+    throw new Error('MongoDB URI not configured');
+  }
+
+  try {
+    client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    db = client.db('onfawiki');
+    console.log('Connected to MongoDB');
+  } catch (error) {
+    console.error('Failed to connect to MongoDB:', error);
+    throw error;
+  }
+}
+
+// Initialize MongoDB connection
+connectToMongoDB().catch(console.error);
+
+// API endpoint để lưu data vào MongoDB
+app.post('/api/save-data', async (req, res) => {
   try {
     const data = req.body;
     
@@ -22,11 +44,27 @@ app.post('/api/save-data', (req, res) => {
     if (!data.menus || !data.pages) {
       return res.status(400).json({ error: 'Invalid data structure' });
     }
+
+    if (!db) {
+      await connectToMongoDB();
+    }
+
+    const collection = db.collection('wikiData');
+
+    // Update hoặc insert document
+    await collection.updateOne(
+      { _id: 'main' },
+      { 
+        $set: {
+          menus: data.menus,
+          pages: data.pages,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
     
-    // Ghi vào file JSON
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
-    
-    console.log('Data saved to', DATA_FILE);
+    console.log('Data saved to MongoDB');
     res.json({ success: true, message: 'Data saved successfully' });
   } catch (error) {
     console.error('Error saving data:', error);
@@ -34,15 +72,30 @@ app.post('/api/save-data', (req, res) => {
   }
 });
 
-// API endpoint để đọc data từ JSON file
-app.get('/api/get-data', (req, res) => {
+// API endpoint để đọc data từ MongoDB
+app.get('/api/get-data', async (req, res) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      res.json(data);
-    } else {
-      res.json({ menus: [], pages: [] });
+    if (!db) {
+      await connectToMongoDB();
     }
+
+    const collection = db.collection('wikiData');
+    let data = await collection.findOne({ _id: 'main' });
+
+    if (!data) {
+      // Nếu chưa có dữ liệu, tạo document mặc định
+      const defaultData = {
+        _id: 'main',
+        menus: [],
+        pages: []
+      };
+      await collection.insertOne(defaultData);
+      data = defaultData;
+    }
+
+    // Loại bỏ _id trước khi trả về
+    const { _id, ...result } = data;
+    res.json(result);
   } catch (error) {
     console.error('Error reading data:', error);
     res.status(500).json({ error: 'Failed to read data', details: error.message });

@@ -1,7 +1,17 @@
-// Data service để quản lý pages và menu với JSON file và localStorage
+// Data service để quản lý pages và menu với MongoDB và localStorage
 
 const STORAGE_KEY = 'wiki_pages_data';
 const JSON_DATA_URL = '/data/wiki-data.json';
+
+// API base URL - tự động detect environment
+const getApiBaseUrl = () => {
+  // Trong production (Vercel) hoặc không phải localhost, sử dụng relative URL
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return '/api';
+  }
+  // Trong development (localhost), sử dụng localhost
+  return 'http://localhost:3001/api';
+};
 
 // Cache cho dữ liệu đã load
 let cachedData = null;
@@ -102,7 +112,7 @@ const defaultData = {
   ]
 };
 
-// Load dữ liệu từ JSON file (async)
+// Load dữ liệu từ API/Database (async)
 export const loadDataFromJSON = async () => {
   // Nếu đã có cache, kiểm tra localStorage trước
   if (cachedData) {
@@ -121,7 +131,7 @@ export const loadDataFromJSON = async () => {
     return cachedData;
   }
 
-  // Kiểm tra localStorage trước khi load từ JSON
+  // Kiểm tra localStorage trước khi load từ API
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -146,25 +156,45 @@ export const loadDataFromJSON = async () => {
 
   isLoading = true;
   try {
-    const response = await fetch(JSON_DATA_URL);
+    // Ưu tiên load từ API (MongoDB)
+    const apiUrl = getApiBaseUrl();
+    const response = await fetch(`${apiUrl}/get-data`);
+    
     if (response.ok) {
       const data = await response.json();
-      // Chỉ lưu vào localStorage nếu localStorage trống
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) {
-        cachedData = data;
+      // Lưu vào localStorage và cache
+      cachedData = data;
+      try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } else {
-        // Nếu localStorage đã có dữ liệu, ưu tiên localStorage
-        cachedData = JSON.parse(stored);
+      } catch (e) {
+        console.warn('Could not save to localStorage:', e);
       }
       isLoading = false;
       return cachedData;
     } else {
-      throw new Error('Failed to load JSON file');
+      throw new Error('Failed to load from API');
     }
-  } catch (error) {
-    console.warn('Error loading from JSON file, trying localStorage:', error);
+  } catch (apiError) {
+    console.warn('Error loading from API, trying JSON file:', apiError);
+    
+    // Fallback về JSON file nếu API không khả dụng
+    try {
+      const response = await fetch(JSON_DATA_URL);
+      if (response.ok) {
+        const data = await response.json();
+        cachedData = data;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+          console.warn('Could not save to localStorage:', e);
+        }
+        isLoading = false;
+        return cachedData;
+      }
+    } catch (jsonError) {
+      console.warn('Error loading from JSON file:', jsonError);
+    }
+    
     // Fallback về localStorage
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -176,6 +206,7 @@ export const loadDataFromJSON = async () => {
     } catch (e) {
       console.error('Error loading from localStorage:', e);
     }
+    
     // Cuối cùng dùng default data
     cachedData = defaultData;
     isLoading = false;
@@ -235,15 +266,16 @@ export const getData = () => {
   return cachedData;
 };
 
-// Lưu dữ liệu vào localStorage, cache và file JSON (qua API)
+// Lưu dữ liệu vào localStorage, cache và database (qua API)
 export const saveData = (data) => {
   try {
     cachedData = data;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     console.log('✅ Data saved to localStorage');
     
-    // Gọi API để lưu vào file JSON (fire-and-forget, không block)
-    fetch('http://localhost:3001/api/save-data', {
+    // Gọi API để lưu vào database (fire-and-forget, không block)
+    const apiUrl = getApiBaseUrl();
+    fetch(`${apiUrl}/save-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -251,11 +283,11 @@ export const saveData = (data) => {
       body: JSON.stringify(data)
     }).then(response => {
       if (response.ok) {
-        console.log('✅ Data saved to JSON file successfully');
+        console.log('✅ Data saved to database successfully');
         // Trigger custom event để UI có thể hiển thị thông báo
         window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: true } }));
       } else {
-        console.warn('⚠️ Failed to save to JSON file, but data saved to localStorage');
+        console.warn('⚠️ Failed to save to database, but data saved to localStorage');
         window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: false, error: 'Server error' } }));
       }
     }).catch(apiError => {
@@ -269,11 +301,12 @@ export const saveData = (data) => {
   }
 };
 
-// Hàm để sync data vào JSON file (có thể gọi thủ công)
+// Hàm để sync data vào database (có thể gọi thủ công)
 export const syncDataToJSON = async () => {
   try {
     const data = getData();
-    const response = await fetch('http://localhost:3001/api/save-data', {
+    const apiUrl = getApiBaseUrl();
+    const response = await fetch(`${apiUrl}/save-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -282,14 +315,14 @@ export const syncDataToJSON = async () => {
     });
     
     if (response.ok) {
-      console.log('✅ Data synced to JSON file successfully');
-      return { success: true, message: 'Đã sync vào file JSON thành công!' };
+      console.log('✅ Data synced to database successfully');
+      return { success: true, message: 'Đã sync vào database thành công!' };
     } else {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Server error');
     }
   } catch (error) {
-    console.error('❌ Error syncing to JSON:', error);
+    console.error('❌ Error syncing to database:', error);
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
       throw new Error('Server không chạy! Vui lòng chạy: npm run dev');
     }
