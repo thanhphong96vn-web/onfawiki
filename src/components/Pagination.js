@@ -1,16 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getMenus, getPages, getPageById } from '../utils/dataService';
 import { useLanguage } from '../contexts/LanguageContext';
 import './Pagination.css';
 
 function Pagination({ currentPageId, onPageChange }) {
   const { translate } = useLanguage();
+  const [menus, setMenus] = useState([]);
+  const [pages, setPages] = useState([]);
+  const [orderedPages, setOrderedPages] = useState([]);
 
-  // Lấy danh sách pages theo thứ tự xuất hiện trong sidebar
-  const getOrderedPages = () => {
-    const menus = getMenus();
-    const pages = getPages();
-    const orderedPages = [];
+  // Load menus và pages từ API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const menusData = await getMenus();
+        const pagesData = await getPages();
+        // Đảm bảo luôn là array
+        setMenus(Array.isArray(menusData) ? menusData : []);
+        setPages(Array.isArray(pagesData) ? pagesData : []);
+      } catch (error) {
+        console.error('Error loading data in Pagination:', error);
+        setMenus([]);
+        setPages([]);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Tính toán orderedPages khi menus hoặc pages thay đổi
+  useEffect(() => {
+    if (!Array.isArray(menus) || !Array.isArray(pages)) {
+      setOrderedPages([]);
+      return;
+    }
+
+    const ordered = [];
     const addedPageIds = new Set();
 
     menus.forEach(menu => {
@@ -19,7 +43,7 @@ function Pagination({ currentPageId, onPageChange }) {
         menu.children.forEach(child => {
           const page = pages.find(p => p.id === child.id);
           if (page && !addedPageIds.has(page.id)) {
-            orderedPages.push(page);
+            ordered.push(page);
             addedPageIds.add(page.id);
           }
         });
@@ -27,7 +51,7 @@ function Pagination({ currentPageId, onPageChange }) {
         // Với menu single, thêm page tương ứng
         const page = pages.find(p => p.id === menu.id);
         if (page && !addedPageIds.has(page.id)) {
-          orderedPages.push(page);
+          ordered.push(page);
           addedPageIds.add(page.id);
         }
       }
@@ -36,14 +60,12 @@ function Pagination({ currentPageId, onPageChange }) {
     // Thêm các pages còn lại không có trong menu (fallback)
     pages.forEach(page => {
       if (!addedPageIds.has(page.id)) {
-        orderedPages.push(page);
+        ordered.push(page);
       }
     });
 
-    return orderedPages;
-  };
-
-  const orderedPages = getOrderedPages();
+    setOrderedPages(ordered);
+  }, [menus, pages]);
   const currentIndex = orderedPages.findIndex(p => p.id === currentPageId);
   const prevPage = currentIndex > 0 ? orderedPages[currentIndex - 1] : null;
   const nextPage = currentIndex < orderedPages.length - 1 ? orderedPages[currentIndex + 1] : null;

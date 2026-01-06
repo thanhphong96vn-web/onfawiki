@@ -110,27 +110,52 @@ export const loadDataFromJSON = async () => {
   try {
     // Luôn load từ API (MongoDB)
     const apiUrl = getApiBaseUrl();
-    console.log('Loading data from API:', `${apiUrl}/get-data`);
-    const response = await fetch(`${apiUrl}/get-data`, {
+    const fullUrl = `${apiUrl}/get-data`;
+    console.log('🔄 Loading data from API:', fullUrl);
+    console.log('📍 Current hostname:', typeof window !== 'undefined' ? window.location.hostname : 'server-side');
+    
+    // Tạo AbortController để timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+    
+    const response = await fetch(fullUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
+    console.log('📡 Response status:', response.status, response.statusText);
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Data loaded from API:', data);
+      console.log('✅ Data loaded from API successfully');
+      console.log('📊 Menus count:', data.menus?.length || 0);
+      console.log('📄 Pages count:', data.pages?.length || 0);
       return data;
     } else {
       const errorText = await response.text();
-      console.error('API response error:', response.status, errorText);
+      console.error('❌ API response error:', response.status, errorText);
       throw new Error(`Failed to load from API: ${response.status} - ${errorText}`);
     }
   } catch (apiError) {
-    console.error('Error loading from API:', apiError);
-    // Nếu API không khả dụng, trả về default data
-    console.warn('Using default data due to API error');
+    console.error('❌ Error loading from API:', apiError);
+    console.error('Error details:', {
+      name: apiError.name,
+      message: apiError.message,
+      stack: apiError.stack
+    });
+    
+    // Nếu API không khả dụng, trả về default data nhưng cảnh báo rõ ràng
+    console.warn('⚠️ Using default data due to API error - this means data is NOT loaded from database!');
+    console.warn('⚠️ Please check:');
+    console.warn('   1. Is the API server running on port 3001?');
+    console.warn('   2. Check browser console for CORS errors');
+    console.warn('   3. Check network tab for failed requests');
+    
     return defaultData;
   }
 };

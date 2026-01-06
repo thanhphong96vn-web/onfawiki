@@ -82,14 +82,20 @@ function Header({ onPageNavigate }) {
       return;
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    const pages = getPages();
-    const menus = getMenus();
+    const performSearch = async () => {
+      try {
+        const query = searchQuery.toLowerCase().trim();
+        const pagesData = await getPages();
+        const menusData = await getMenus();
+        
+        // Đảm bảo là array
+        const pages = Array.isArray(pagesData) ? pagesData : [];
+        const menus = Array.isArray(menusData) ? menusData : [];
 
-    const results = [];
+        const results = [];
 
-    // Search in pages
-    pages.forEach(page => {
+        // Search in pages
+        pages.forEach(page => {
       const titleMatch = page.title.toLowerCase().includes(query);
       const contentMatch = page.content.toLowerCase().includes(query);
       
@@ -133,7 +139,14 @@ function Header({ onPageNavigate }) {
       }
     });
 
-    setSearchResults(results);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Error performing search:', error);
+        setSearchResults([]);
+      }
+    };
+
+    performSearch();
   }, [searchQuery]);
 
   const handleSearchResultClick = (resultId) => {

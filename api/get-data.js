@@ -1,5 +1,40 @@
 // Vercel serverless function để lấy dữ liệu từ MongoDB
-const clientPromise = require('../lib/mongodb');
+const { MongoClient } = require('mongodb');
+
+// Load environment variables for local development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
+// Cache client để reuse connection
+let cachedClient = null;
+
+async function connectToDatabase() {
+  if (cachedClient) {
+    return cachedClient;
+  }
+
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MONGODB_URI is not set');
+  }
+
+  const client = new MongoClient(process.env.MONGODB_URI, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 30000,
+    retryWrites: true,
+    w: 'majority'
+  });
+
+  try {
+    await client.connect();
+    cachedClient = client;
+    return client;
+  } catch (error) {
+    console.error('Failed to connect to MongoDB:', error);
+    throw error;
+  }
+}
 
 module.exports = async function handler(req, res) {
   // Enable CORS
@@ -15,6 +50,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  let client;
   try {
     if (!process.env.MONGODB_URI) {
       console.error('MONGODB_URI is not set');
@@ -24,17 +60,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    let client;
-    try {
-      client = await clientPromise;
-    } catch (connectionError) {
-      console.error('MongoDB connection error:', connectionError);
-      return res.status(500).json({ 
-        error: 'Database connection failed', 
-        details: connectionError.message 
-      });
-    }
-
+    // Connect to database
+    client = await connectToDatabase();
     const db = client.db('onfawiki');
     const collection = db.collection('wikiData');
 
@@ -57,6 +84,17 @@ module.exports = async function handler(req, res) {
     res.status(200).json(result);
   } catch (error) {
     console.error('Error fetching data:', error);
+    
+    // Clear cached client on error để reconnect lần sau
+    if (cachedClient) {
+      try {
+        await cachedClient.close();
+      } catch (closeError) {
+        console.error('Error closing client:', closeError);
+      }
+      cachedClient = null;
+    }
+    
     res.status(500).json({ 
       error: 'Failed to fetch data', 
       details: error.message,

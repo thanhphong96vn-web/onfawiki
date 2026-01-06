@@ -151,14 +151,21 @@ function App() {
 
   const loadData = async () => {
     try {
+      console.log('🚀 Starting to load data...');
       const menusData = await getMenus();
       const pagesData = await getPages();
-      console.log('Loading data - Menus:', menusData.length, 'Pages:', pagesData.length);
+      console.log('✅ Data loaded successfully - Menus:', menusData.length, 'Pages:', pagesData.length);
+      
+      if (menusData.length === 0 && pagesData.length === 0) {
+        console.warn('⚠️ Warning: No data loaded from database. Check if database has data.');
+      }
+      
       setMenus(menusData);
       setPages(pagesData);
       setFilteredMenus(menusData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading data:', error);
+      console.error('Error stack:', error.stack);
       // Set empty arrays nếu không load được
       setMenus([]);
       setPages([]);

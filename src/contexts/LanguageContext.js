@@ -73,13 +73,19 @@ export const LanguageProvider = ({ children }) => {
     setIsTranslating(false);
   };
 
-  const extractTextsFromData = () => {
-    const menus = getMenus();
-    const pages = getPages();
-    const texts = {};
+  const extractTextsFromData = async () => {
+    try {
+      const menusData = await getMenus();
+      const pagesData = await getPages();
+      
+      // Đảm bảo là array
+      const menus = Array.isArray(menusData) ? menusData : [];
+      const pages = Array.isArray(pagesData) ? pagesData : [];
+      
+      const texts = {};
 
-    // Dịch menus
-    menus.forEach(menu => {
+      // Dịch menus
+      menus.forEach(menu => {
       texts[`menu_${menu.id}`] = menu.title;
       if (menu.children) {
         menu.children.forEach(child => {
@@ -100,52 +106,56 @@ export const LanguageProvider = ({ children }) => {
       }
     });
 
-    // Dịch các UI text
-    texts['ui_header_buy_crypto'] = 'Mua Crypto';
-    texts['ui_header_market'] = 'Thị trường';
-    texts['ui_header_trade'] = 'Giao dịch';
-    texts['ui_header_futures'] = 'Futures';
-    texts['ui_header_earn'] = 'Earn';
-    texts['ui_header_square'] = 'Square';
-    texts['ui_header_more'] = 'Nhiều hơn';
-    texts['ui_header_login'] = 'Đăng nhập';
-    texts['ui_header_register'] = 'Đăng ký';
-    texts['ui_admin'] = 'Admin';
-    texts['ui_share'] = 'Chia sẻ';
-    texts['ui_search'] = 'Tìm';
-    texts['ui_register_now'] = 'Đăng ký ngay';
-    texts['ui_register_promo'] = 'Đăng ký ngay - Nhận nhiều quà tặng hấp dẫn cho người mới (dành cho người dùng đã xác minh)';
-    texts['ui_related_articles'] = 'Bài viết liên quan';
-    texts['ui_share_title'] = 'Chia sẻ';
-    texts['ui_share_text'] = 'Chia sẻ với bạn bè để kiếm voucher và nhiều quà tặng giá trị lớn với ONFA Wallet';
-    texts['ui_learn_more'] = 'Tìm hiểu thêm';
-    texts['ui_login_to_earn'] = 'Đăng nhập để kiếm quà tặng đến từ việc chia sẻ';
-    texts['ui_copy_link'] = 'Đã sao chép link!';
-    texts['ui_copy_link_title'] = 'Sao chép link';
-    texts['ui_share_facebook'] = 'Chia sẻ lên Facebook';
-    texts['ui_share_telegram'] = 'Chia sẻ lên Telegram';
-    texts['ui_share_twitter'] = 'Chia sẻ lên X (Twitter)';
-    texts['ui_share_whatsapp'] = 'Chia sẻ lên WhatsApp';
-    texts['ui_share_reddit'] = 'Chia sẻ lên Reddit';
-    texts['ui_empty_select_page'] = 'Chọn một trang để xem nội dung';
-    texts['ui_empty_select_menu'] = 'Vui lòng chọn một mục từ menu bên trái để xem nội dung';
-    texts['ui_language'] = 'Ngôn ngữ';
-    
-    // Menu items
-    texts['ui_menu_what_is_onfa'] = 'Onfa là gì';
-    texts['ui_menu_overview'] = 'Tổng quan';
-    texts['ui_menu_license'] = 'Giấy phép';
-    texts['ui_menu_team'] = 'Đội ngũ';
-    texts['ui_menu_whitepaper'] = 'Sách trắng';
-    texts['ui_menu_features'] = 'Tính năng';
-    texts['ui_menu_onfa_token'] = 'Token ONFA';
-    texts['ui_menu_metti_token'] = 'Token Metti';
-    texts['ui_menu_onfa_hope'] = 'ONFA Hope';
-    texts['ui_menu_benefits'] = 'Lợi ích';
-    texts['ui_menu_affiliate'] = 'Đối tác';
-    texts['ui_menu_contact_us'] = 'Liên hệ';
+      // Dịch các UI text
+      texts['ui_header_buy_crypto'] = 'Mua Crypto';
+      texts['ui_header_market'] = 'Thị trường';
+      texts['ui_header_trade'] = 'Giao dịch';
+      texts['ui_header_futures'] = 'Futures';
+      texts['ui_header_earn'] = 'Earn';
+      texts['ui_header_square'] = 'Square';
+      texts['ui_header_more'] = 'Nhiều hơn';
+      texts['ui_header_login'] = 'Đăng nhập';
+      texts['ui_header_register'] = 'Đăng ký';
+      texts['ui_admin'] = 'Admin';
+      texts['ui_share'] = 'Chia sẻ';
+      texts['ui_search'] = 'Tìm';
+      texts['ui_register_now'] = 'Đăng ký ngay';
+      texts['ui_register_promo'] = 'Đăng ký ngay - Nhận nhiều quà tặng hấp dẫn cho người mới (dành cho người dùng đã xác minh)';
+      texts['ui_related_articles'] = 'Bài viết liên quan';
+      texts['ui_share_title'] = 'Chia sẻ';
+      texts['ui_share_text'] = 'Chia sẻ với bạn bè để kiếm voucher và nhiều quà tặng giá trị lớn với ONFA Wallet';
+      texts['ui_learn_more'] = 'Tìm hiểu thêm';
+      texts['ui_login_to_earn'] = 'Đăng nhập để kiếm quà tặng đến từ việc chia sẻ';
+      texts['ui_copy_link'] = 'Đã sao chép link!';
+      texts['ui_copy_link_title'] = 'Sao chép link';
+      texts['ui_share_facebook'] = 'Chia sẻ lên Facebook';
+      texts['ui_share_telegram'] = 'Chia sẻ lên Telegram';
+      texts['ui_share_twitter'] = 'Chia sẻ lên X (Twitter)';
+      texts['ui_share_whatsapp'] = 'Chia sẻ lên WhatsApp';
+      texts['ui_share_reddit'] = 'Chia sẻ lên Reddit';
+      texts['ui_empty_select_page'] = 'Chọn một trang để xem nội dung';
+      texts['ui_empty_select_menu'] = 'Vui lòng chọn một mục từ menu bên trái để xem nội dung';
+      texts['ui_language'] = 'Ngôn ngữ';
+      
+      // Menu items
+      texts['ui_menu_what_is_onfa'] = 'Onfa là gì';
+      texts['ui_menu_overview'] = 'Tổng quan';
+      texts['ui_menu_license'] = 'Giấy phép';
+      texts['ui_menu_team'] = 'Đội ngũ';
+      texts['ui_menu_whitepaper'] = 'Sách trắng';
+      texts['ui_menu_features'] = 'Tính năng';
+      texts['ui_menu_onfa_token'] = 'Token ONFA';
+      texts['ui_menu_metti_token'] = 'Token Metti';
+      texts['ui_menu_onfa_hope'] = 'ONFA Hope';
+      texts['ui_menu_benefits'] = 'Lợi ích';
+      texts['ui_menu_affiliate'] = 'Đối tác';
+      texts['ui_menu_contact_us'] = 'Liên hệ';
 
-    return texts;
+      return texts;
+    } catch (error) {
+      console.error('Error extracting texts from data:', error);
+      return {};
+    }
   };
 
   // Đã loại bỏ translateTexts - không còn dịch động nữa
