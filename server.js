@@ -4,46 +4,87 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
-// Load .env file explicitly - try multiple methods
+// Load .env file explicitly - FORCE load với nhiều phương pháp
 const envPath = path.resolve(__dirname, '.env');
 console.log('=== Loading .env file ===');
 console.log('Looking for .env at:', envPath);
 console.log('.env file exists:', fs.existsSync(envPath));
 
-// Method 1: Try dotenv with explicit path
-require('dotenv').config({ path: envPath });
+// Method 1: Try dotenv với nhiều cách
+require('dotenv').config(); // Load từ root
+require('dotenv').config({ path: envPath }); // Load với explicit path
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env') }); // Load từ cwd
 
-// Method 2: If still not loaded, try reading file directly
+// Method 2: FORCE đọc file trực tiếp và set vào process.env
 if (!process.env.MONGODB_URI) {
-  console.log('MONGODB_URI not found, trying to read .env directly...');
+  console.log('MONGODB_URI not found after dotenv, FORCE reading .env directly...');
   try {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    // Handle both \n and \r\n line endings
-    const lines = envContent.split(/\r?\n/);
-    console.log('Total lines in .env:', lines.length);
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('#')) {
-        const equalIndex = trimmed.indexOf('=');
-        if (equalIndex > 0) {
-          const key = trimmed.substring(0, equalIndex).trim();
-          const value = trimmed.substring(equalIndex + 1).trim();
-          if (key === 'MONGODB_URI') {
-            process.env.MONGODB_URI = value;
-            console.log('✅ Successfully loaded MONGODB_URI from .env file');
-            console.log('Value length:', value.length);
-            break;
+    if (fs.existsSync(envPath)) {
+      // Thử đọc với nhiều encoding
+      let envContent;
+      try {
+        // Thử UTF-8 trước
+        envContent = fs.readFileSync(envPath, 'utf8');
+        // Nếu có BOM hoặc ký tự lạ, thử UTF-16
+        if (envContent.charCodeAt(0) === 0xFEFF || envContent.includes('\u0000')) {
+          console.log('Detected UTF-16 encoding, converting...');
+          envContent = fs.readFileSync(envPath, 'utf16le');
+          // Remove BOM nếu có
+          if (envContent.charCodeAt(0) === 0xFEFF) {
+            envContent = envContent.substring(1);
+          }
+        }
+      } catch (e) {
+        // Nếu UTF-8 fail, thử UTF-16
+        console.log('UTF-8 failed, trying UTF-16...');
+        envContent = fs.readFileSync(envPath, 'utf16le');
+        if (envContent.charCodeAt(0) === 0xFEFF) {
+          envContent = envContent.substring(1);
+        }
+      }
+      
+      console.log('File content length:', envContent.length);
+      console.log('First 50 chars:', envContent.substring(0, 50));
+      
+      // Handle both \n and \r\n line endings
+      const lines = envContent.split(/\r?\n/);
+      console.log('Total lines in .env:', lines.length);
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          // Tìm dấu = đầu tiên
+          const equalIndex = trimmed.indexOf('=');
+          if (equalIndex > 0) {
+            const key = trimmed.substring(0, equalIndex).trim();
+            const value = trimmed.substring(equalIndex + 1).trim();
+            console.log(`Found key: ${key}, value length: ${value.length}`);
+            
+            if (key === 'MONGODB_URI') {
+              process.env.MONGODB_URI = value;
+              console.log('✅✅✅ FORCE loaded MONGODB_URI from .env file');
+              console.log('Value length:', value.length);
+              console.log('Value starts with:', value.substring(0, 30));
+              break;
+            }
           }
         }
       }
+    } else {
+      console.error('❌ .env file does not exist at:', envPath);
     }
+    
     if (!process.env.MONGODB_URI) {
       console.error('❌ MONGODB_URI still not found after reading .env file');
-      console.error('File content preview:', envContent.substring(0, 100));
+      if (fs.existsSync(envPath)) {
+        const preview = fs.readFileSync(envPath, 'utf8').substring(0, 200);
+        console.error('File content preview:', preview);
+      }
     }
   } catch (err) {
     console.error('Error reading .env file:', err);
+    console.error('Error stack:', err.stack);
   }
 }
 
@@ -193,16 +234,43 @@ app.post('/api/save-data', async (req, res) => {
 // API endpoint để đọc data từ MongoDB
 app.get('/api/get-data', async (req, res) => {
   try {
-    // Kiểm tra MONGODB_URI trước
+    // CRITICAL: Kiểm tra và load lại MONGODB_URI nếu chưa có
     if (!process.env.MONGODB_URI) {
-      console.error('MONGODB_URI not found in request handler');
+      console.log('⚠️ MONGODB_URI not found in request handler, trying to reload...');
+      // Thử load lại từ .env
+      const envPath = path.resolve(__dirname, '.env');
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const lines = envContent.split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#') && trimmed.startsWith('MONGODB_URI=')) {
+            const value = trimmed.substring('MONGODB_URI='.length).trim();
+            process.env.MONGODB_URI = value;
+            console.log('✅ Reloaded MONGODB_URI from .env file');
+            break;
+          }
+        }
+      }
+    }
+    
+    // Kiểm tra lại sau khi reload
+    if (!process.env.MONGODB_URI) {
+      console.error('❌ MONGODB_URI still not found after reload attempt');
+      console.error('Current env vars:', Object.keys(process.env).filter(k => k.includes('MONGO')));
       return res.status(500).json({ 
         error: 'Failed to read data', 
-        details: 'MongoDB URI not configured' 
+        details: 'MongoDB URI not configured. Please check .env file.',
+        debug: {
+          envPath: path.resolve(__dirname, '.env'),
+          envExists: fs.existsSync(path.resolve(__dirname, '.env')),
+          cwd: process.cwd(),
+          __dirname: __dirname
+        }
       });
     }
 
-    if (!db) {
+    if (!db || !client?.isConnected?.()) {
       await connectToMongoDB();
     }
 

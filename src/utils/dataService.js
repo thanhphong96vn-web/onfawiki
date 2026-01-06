@@ -2,12 +2,19 @@
 
 // API base URL - tự động detect environment
 const getApiBaseUrl = () => {
-  // Trong production (Vercel) hoặc không phải localhost, sử dụng relative URL
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return '/api';
+  // Nếu có REACT_APP_API_URL, dùng nó (ưu tiên cao nhất)
+  if (typeof window !== 'undefined' && process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
   }
-  // Trong development (localhost), sử dụng localhost
-  return 'http://localhost:3001/api';
+  
+  // Development: Dùng localhost:3001 (server.js)
+  // Production: Dùng relative URL (Vercel serverless functions)
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:3001/api';
+  }
+  
+  // Production: Vercel tự động route /api đến serverless functions
+  return '/api';
 };
 
 // Function to clear cache (không còn dùng nữa nhưng giữ lại để tương thích)
@@ -132,9 +139,23 @@ export const loadDataFromJSON = async () => {
     
     if (response.ok) {
       const data = await response.json();
+      
+      // Validation: Kiểm tra data structure
+      if (!data || !Array.isArray(data.pages) || !Array.isArray(data.menus)) {
+        console.error('❌ Invalid data structure from API:', data);
+        throw new Error('Invalid data structure received from API');
+      }
+      
       console.log('✅ Data loaded from API successfully');
       console.log('📊 Menus count:', data.menus?.length || 0);
       console.log('📄 Pages count:', data.pages?.length || 0);
+      
+      // Cảnh báo nếu dữ liệu có vẻ không đầy đủ
+      if (data.pages.length < 10 && data.menus.length < 5) {
+        console.warn('⚠️ WARNING: Loaded data seems incomplete!');
+        console.warn('⚠️ This might indicate database issue or data loss.');
+      }
+      
       return data;
     } else {
       const errorText = await response.text();
@@ -149,14 +170,25 @@ export const loadDataFromJSON = async () => {
       stack: apiError.stack
     });
     
-    // Nếu API không khả dụng, trả về default data nhưng cảnh báo rõ ràng
-    console.warn('⚠️ Using default data due to API error - this means data is NOT loaded from database!');
-    console.warn('⚠️ Please check:');
-    console.warn('   1. Is the API server running on port 3001?');
-    console.warn('   2. Check browser console for CORS errors');
-    console.warn('   3. Check network tab for failed requests');
+    // Trả về empty data để app vẫn có thể hiển thị, nhưng đánh dấu là không load được
+    // Điều này sẽ ngăn việc save để tránh mất dữ liệu
+    console.error('⚠️ WARNING: Cannot load data from API!');
+    console.error('⚠️ App will use empty data. Saving will be disabled to prevent data loss.');
+    console.error('⚠️ Please check:');
+    console.error('   1. Development: Are you running `npm run dev` (starts both server and React)?');
+    console.error('   2. Development: Is server.js running on port 3001?');
+    console.error('   3. Production: Check Vercel Environment Variables (MONGODB_URI)');
+    console.error('   4. Check browser console for CORS errors');
+    console.error('   5. Check network tab for failed requests');
+    console.error('   6. Check MongoDB connection and IP whitelist');
     
-    return defaultData;
+    // Trả về empty data với flag để biết là API fail
+    return {
+      menus: [],
+      pages: [],
+      _apiFailed: true, // Flag để biết API đã fail
+      _error: apiError.message
+    };
   }
 };
 
@@ -170,6 +202,44 @@ export const getData = () => {
 // Lưu dữ liệu vào database (100% qua API, không dùng localStorage)
 export const saveData = async (data) => {
   try {
+    // CRITICAL: Kiểm tra xem data có flag _apiFailed không (nghĩa là đang dùng empty data do API fail)
+    if (data._apiFailed) {
+      const errorMsg = `Cannot save data: API connection failed. Please start the API server (port 3001) and try again.`;
+      console.error('❌', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    // Validation: Kiểm tra data trước khi save
+    if (!data || !Array.isArray(data.pages) || !Array.isArray(data.menus)) {
+      console.error('❌ Invalid data structure when saving:', data);
+      throw new Error('Invalid data structure: data must have pages and menus arrays');
+    }
+    
+    // Validation: Cảnh báo nếu dữ liệu có vẻ không đầy đủ
+    if (data.pages.length < 10 && data.menus.length < 5) {
+      console.warn('⚠️ WARNING: Saving data with very few items!');
+      console.warn('⚠️ Pages:', data.pages.length, 'Menus:', data.menus.length);
+      console.warn('⚠️ This might indicate data loss. Please verify before saving.');
+      
+      // Hỏi user xác nhận nếu dữ liệu quá ít (chỉ trong development)
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        const confirmed = window.confirm(
+          `⚠️ CẢNH BÁO: Bạn đang lưu dữ liệu với rất ít items!\n\n` +
+          `Pages: ${data.pages.length}\n` +
+          `Menus: ${data.menus.length}\n\n` +
+          `Điều này có thể gây mất dữ liệu. Bạn có chắc muốn tiếp tục?`
+        );
+        if (!confirmed) {
+          throw new Error('Save cancelled by user due to data validation warning');
+        }
+      }
+    }
+    
+    console.log('💾 Saving data to database:', {
+      pages: data.pages.length,
+      menus: data.menus.length
+    });
+    
     const apiUrl = getApiBaseUrl();
     const response = await fetch(`${apiUrl}/save-data`, {
       method: 'POST',
@@ -180,16 +250,25 @@ export const saveData = async (data) => {
     });
     
     if (response.ok) {
-      console.log('✅ Data saved to database successfully');
+      const result = await response.json();
+      console.log('✅ Data saved to database successfully:', {
+        pages: data.pages.length,
+        menus: data.menus.length
+      });
       // Trigger custom event để UI có thể hiển thị thông báo
       window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: true } }));
       return { success: true };
     } else {
       const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Server error when saving:', errorData);
       throw new Error(errorData.error || 'Server error');
     }
   } catch (error) {
     console.error('❌ Error saving data to database:', error);
+    console.error('❌ Data that failed to save:', {
+      pages: data?.pages?.length || 0,
+      menus: data?.menus?.length || 0
+    });
     window.dispatchEvent(new CustomEvent('dataSavedToJSON', { detail: { success: false, error: error.message } }));
     throw error;
   }
@@ -267,6 +346,7 @@ export const importDataFromJSON = async (file) => {
 // Lấy tất cả menus (bao gồm cả các trang không có menu cha) - async từ API
 export const getMenus = async () => {
   const data = await loadDataFromJSON();
+  // Nếu API fail, trả về empty arrays để app vẫn hoạt động
   const menus = data.menus || [];
   const pages = data.pages || [];
   
@@ -291,6 +371,7 @@ export const getMenus = async () => {
 // Lấy tất cả pages - async từ API
 export const getPages = async () => {
   const data = await loadDataFromJSON();
+  // Nếu API fail, trả về empty array để app vẫn hoạt động
   return data.pages || [];
 };
 
@@ -303,6 +384,20 @@ export const getPageById = async (id) => {
 // Tạo page mới - async từ API
 export const createPage = async (pageData) => {
   const data = await loadDataFromJSON();
+  
+  // CRITICAL: Kiểm tra xem API có fail không
+  if (data._apiFailed) {
+    const errorMsg = `Cannot create page: API connection failed. Please start the API server (port 3001) and try again.`;
+    console.error('❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+  
+  // Validation: Đảm bảo data có đầy đủ pages và menus
+  if (!data || !Array.isArray(data.pages) || !Array.isArray(data.menus)) {
+    console.error('❌ Invalid data structure when creating page:', data);
+    throw new Error('Invalid data structure: data must have pages and menus arrays');
+  }
+  
   const newPage = {
     id: pageData.id || `page-${Date.now()}`,
     title: pageData.title,
@@ -342,16 +437,53 @@ export const createPage = async (pageData) => {
 // Cập nhật page - async từ API
 export const updatePage = async (id, pageData) => {
   const data = await loadDataFromJSON();
+  
+  // CRITICAL: Kiểm tra xem API có fail không
+  if (data._apiFailed) {
+    const errorMsg = `Cannot update page: API connection failed. Please start the API server (port 3001) and try again.`;
+    console.error('❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+  
+  // Validation: Đảm bảo data có đầy đủ pages và menus
+  if (!data || !Array.isArray(data.pages) || !Array.isArray(data.menus)) {
+    console.error('❌ Invalid data structure when updating page:', data);
+    throw new Error('Invalid data structure: data must have pages and menus arrays');
+  }
+  
+  // CRITICAL: Kiểm tra xem có phải đang dùng defaultData không (có thể do API lỗi)
+  // Nếu dữ liệu quá ít, có thể đang dùng defaultData và sẽ gây mất dữ liệu!
+  const MIN_EXPECTED_PAGES = 10; // Ngưỡng tối thiểu để cảnh báo
+  if (data.pages.length < MIN_EXPECTED_PAGES) {
+    const errorMsg = `CRITICAL: Data seems incomplete (only ${data.pages.length} pages). This might cause data loss! Cannot proceed with update.`;
+    console.error('❌', errorMsg);
+    console.error('❌ Current data:', {
+      pages: data.pages.length,
+      menus: data.menus.length,
+      pageIds: data.pages.map(p => p.id).slice(0, 10)
+    });
+    throw new Error(errorMsg);
+  }
+  
   const pageIndex = data.pages.findIndex(p => p.id === id);
   
-  if (pageIndex === -1) return null;
+  if (pageIndex === -1) {
+    console.error('❌ Page not found:', id);
+    throw new Error(`Page with id "${id}" not found`);
+  }
+  
+  console.log('📝 Updating page:', id, 'Current pages count:', data.pages.length);
   
   const oldParentId = data.pages[pageIndex].parentId;
+  const oldPage = { ...data.pages[pageIndex] };
+  
   data.pages[pageIndex] = {
-    ...data.pages[pageIndex],
+    ...oldPage,
     ...pageData,
     id // Đảm bảo ID không bị thay đổi
   };
+  
+  console.log('✅ Page updated. Pages count after update:', data.pages.length);
   
   // Cập nhật title trong menu children nếu có
   if (data.pages[pageIndex].parentId) {
@@ -393,6 +525,20 @@ export const updatePage = async (id, pageData) => {
 // Xóa page - async từ API
 export const deletePage = async (id) => {
   const data = await loadDataFromJSON();
+  
+  // CRITICAL: Kiểm tra xem API có fail không
+  if (data._apiFailed) {
+    const errorMsg = `Cannot delete page: API connection failed. Please start the API server (port 3001) and try again.`;
+    console.error('❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+  
+  // Validation: Đảm bảo data có đầy đủ pages và menus
+  if (!data || !Array.isArray(data.pages) || !Array.isArray(data.menus)) {
+    console.error('❌ Invalid data structure when deleting page:', data);
+    throw new Error('Invalid data structure: data must have pages and menus arrays');
+  }
+  
   const page = data.pages.find(p => p.id === id);
   
   if (!page) return false;

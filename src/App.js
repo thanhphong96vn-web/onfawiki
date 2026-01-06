@@ -7,6 +7,7 @@ import AdminLogin from './components/AdminLogin';
 import MenuIcon from './components/MenuIcon';
 import Header from './components/Header';
 import ShareModal from './components/ShareModal';
+import Loading from './components/Loading';
 import './App.css';
 
 function App() {
@@ -41,6 +42,8 @@ function App() {
   const [sidebarSearchResults, setSidebarSearchResults] = useState([]);
   const [filteredMenus, setFilteredMenus] = useState([]);
   const [showSidebarMenu, setShowSidebarMenu] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const isNavigatingFromClick = useRef(false);
 
   useEffect(() => {
@@ -92,8 +95,8 @@ function App() {
             }
           }
         } else {
-          // Nếu không có hash, load page đầu tiên
-          const firstPage = pages[0];
+          // Nếu không có hash, tìm page đầu tiên từ menu đầu tiên
+          const firstPage = getFirstPageFromMenus(menus, pages);
           if (firstPage) {
             setActivePageId(firstPage.id);
             window.location.hash = encodeURIComponent(firstPage.id);
@@ -149,7 +152,39 @@ function App() {
     };
   }, []);
 
-  const loadData = async () => {
+  // Hàm helper để tìm page đầu tiên từ menu đầu tiên
+  const getFirstPageFromMenus = (menusData, pagesData) => {
+    if (!menusData || menusData.length === 0 || !pagesData || pagesData.length === 0) {
+      return null;
+    }
+
+    // Lấy menu đầu tiên
+    const firstMenu = menusData[0];
+    
+    if (firstMenu.type === 'parent' && firstMenu.children && firstMenu.children.length > 0) {
+      // Nếu là menu parent, lấy child đầu tiên
+      const firstChildId = firstMenu.children[0].id;
+      const firstPage = pagesData.find(p => p.id === firstChildId);
+      if (firstPage) {
+        return firstPage;
+      }
+    } else if (firstMenu.type === 'single') {
+      // Nếu là menu single, lấy page tương ứng
+      const firstPage = pagesData.find(p => p.id === firstMenu.id);
+      if (firstPage) {
+        return firstPage;
+      }
+    }
+
+    // Fallback: lấy page đầu tiên từ danh sách pages
+    return pagesData[0] || null;
+  };
+
+  const loadData = async (showLoading = false) => {
+    // Chỉ hiển thị loading nếu là initial load hoặc được yêu cầu
+    if (isInitialLoad || showLoading) {
+      setIsLoading(true);
+    }
     try {
       console.log('🚀 Starting to load data...');
       const menusData = await getMenus();
@@ -163,6 +198,16 @@ function App() {
       setMenus(menusData);
       setPages(pagesData);
       setFilteredMenus(menusData);
+
+      // Sau khi load data xong, nếu là initial load và chưa có hash, tự động chọn page đầu tiên
+      if (isInitialLoad && !window.location.hash) {
+        const firstPage = getFirstPageFromMenus(menusData, pagesData);
+        if (firstPage) {
+          console.log('📍 Auto-selecting first page:', firstPage.id);
+          setActivePageId(firstPage.id);
+          window.location.hash = encodeURIComponent(firstPage.id);
+        }
+      }
     } catch (error) {
       console.error('❌ Error loading data:', error);
       console.error('Error stack:', error.stack);
@@ -170,6 +215,11 @@ function App() {
       setMenus([]);
       setPages([]);
       setFilteredMenus([]);
+    } finally {
+      if (isInitialLoad || showLoading) {
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
     }
   };
 
@@ -345,8 +395,8 @@ function App() {
     if (activePageId) {
       const page = pages.find(p => p.id === activePageId);
       if (!page) {
-        // If page was deleted, load first available page
-        const firstPage = pages[0];
+        // If page was deleted, load first available page từ menu đầu tiên
+        const firstPage = getFirstPageFromMenus(menus, pages);
         if (firstPage) {
           setActivePageId(firstPage.id);
           window.location.hash = encodeURIComponent(firstPage.id);
@@ -362,8 +412,8 @@ function App() {
         }, 0);
       }
     } else {
-      // If no active page, load first available page
-      const firstPage = pages[0];
+      // If no active page, load first available page từ menu đầu tiên
+      const firstPage = getFirstPageFromMenus(menus, pages);
       if (firstPage) {
         setActivePageId(firstPage.id);
         window.location.hash = encodeURIComponent(firstPage.id);
@@ -375,8 +425,8 @@ function App() {
     setShowAdmin(false);
     // Reload data khi quay về từ admin
     await loadData();
-    // Quay về trang đầu tiên hoặc trang trước đó
-    const firstPage = pages[0];
+    // Quay về trang đầu tiên hoặc trang trước đó từ menu đầu tiên
+    const firstPage = getFirstPageFromMenus(menus, pages);
     if (firstPage) {
       setActivePageId(firstPage.id);
       window.location.hash = encodeURIComponent(firstPage.id);
@@ -418,6 +468,7 @@ function App() {
 
   return (
     <div className="onfa-wiki">
+      {isLoading && <Loading />}
       <Header onPageNavigate={handlePageNavigate} />
 
       <div className="wiki-container">

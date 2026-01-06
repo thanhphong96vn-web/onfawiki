@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import RichTextEditor from './RichTextEditor';
 import MenuIcon from './MenuIcon';
+import NotificationStack from './NotificationStack';
+import Loading from './Loading';
 import { getMenus, getPages, createPage, updatePage, deletePage, createMenu, updateMenu, deleteMenu, loadDataFromJSON, exportDataToJSON, importDataFromJSON, clearCache, syncDataToJSON } from '../utils/dataService';
 import './AdminDashboard.css';
 
@@ -28,6 +30,9 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
   const iconFileInputRef = useRef(null);
   const formSectionRef = useRef(null);
   const listSectionRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const notificationIdRef = useRef(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Load dữ liệu từ database (100% từ API)
@@ -36,7 +41,7 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
     // Listen for data saved events để tự động reload
     const handleDataSaved = async (event) => {
       if (event.detail && event.detail.success === true) {
-        // Reload data sau khi save thành công
+        // Reload data sau khi save thành công (không hiển thị loading vì đã có notification)
         await loadData();
       }
     };
@@ -71,7 +76,26 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
   }, [pages, menus, activeTab]);
 
 
+  // Hàm để hiển thị notification
+  const showNotification = (message, type = 'success', duration = 3000) => {
+    const id = notificationIdRef.current++;
+    const notification = {
+      id,
+      message,
+      type,
+      duration
+    };
+    setNotifications(prev => [...prev, notification]);
+    return id;
+  };
+
+  // Hàm để xóa notification
+  const removeNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   const loadData = async () => {
+    setIsLoading(true);
     try {
       const menusData = await getMenus();
       const pagesData = await getPages();
@@ -84,6 +108,9 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
       // Set empty arrays nếu không load được
       setMenus([]);
       setPages([]);
+      showNotification('Lỗi khi tải dữ liệu: ' + error.message, 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -114,9 +141,14 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
       if (onDataChange) {
         onDataChange();
       }
+      
+      showNotification(
+        editingPage ? 'Cập nhật trang thành công!' : 'Tạo trang mới thành công!',
+        'success'
+      );
     } catch (error) {
       console.error('Error saving page:', error);
-      alert('❌ Lỗi khi lưu trang: ' + error.message);
+      showNotification('Lỗi khi lưu trang: ' + error.message, 'error');
     }
   };
 
@@ -148,9 +180,14 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
       if (onDataChange) {
         onDataChange();
       }
+      
+      showNotification(
+        editingMenu ? 'Cập nhật menu thành công!' : 'Tạo menu mới thành công!',
+        'success'
+      );
     } catch (error) {
       console.error('Error saving menu:', error);
-      alert('❌ Lỗi khi lưu menu: ' + error.message);
+      showNotification('Lỗi khi lưu menu: ' + error.message, 'error');
     }
   };
 
@@ -182,33 +219,45 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
     setActiveTab('menus');
   };
 
-  const handleDeletePage = (id) => {
+  const handleDeletePage = async (id) => {
     if (window.confirm('Bạn có chắc muốn xóa trang này?')) {
-      deletePage(id);
-      loadData();
-      // Điều chỉnh pagination nếu trang hiện tại trở thành trống
-      setTimeout(() => {
-        const newTotalPages = Math.ceil((pages.length - 1) / pagesPerPage);
-        if (pagesCurrentPage > newTotalPages && newTotalPages > 0) {
-          setPagesCurrentPage(newTotalPages);
-        }
-      }, 100);
-      if (onDataChange) onDataChange();
+      try {
+        await deletePage(id);
+        await loadData();
+        // Điều chỉnh pagination nếu trang hiện tại trở thành trống
+        setTimeout(() => {
+          const newTotalPages = Math.ceil((pages.length - 1) / pagesPerPage);
+          if (pagesCurrentPage > newTotalPages && newTotalPages > 0) {
+            setPagesCurrentPage(newTotalPages);
+          }
+        }, 100);
+        if (onDataChange) onDataChange();
+        showNotification('Xóa trang thành công!', 'success');
+      } catch (error) {
+        console.error('Error deleting page:', error);
+        showNotification('Lỗi khi xóa trang: ' + error.message, 'error');
+      }
     }
   };
 
-  const handleDeleteMenu = (id) => {
+  const handleDeleteMenu = async (id) => {
     if (window.confirm('Bạn có chắc muốn xóa menu này? Tất cả các trang con sẽ bị xóa.')) {
-      deleteMenu(id);
-      loadData();
-      // Điều chỉnh pagination nếu trang hiện tại trở thành trống
-      setTimeout(() => {
-        const newTotalPages = Math.ceil((menus.length - 1) / menusPerPage);
-        if (menusCurrentPage > newTotalPages && newTotalPages > 0) {
-          setMenusCurrentPage(newTotalPages);
-        }
-      }, 100);
-      if (onDataChange) onDataChange();
+      try {
+        await deleteMenu(id);
+        await loadData();
+        // Điều chỉnh pagination nếu trang hiện tại trở thành trống
+        setTimeout(() => {
+          const newTotalPages = Math.ceil((menus.length - 1) / menusPerPage);
+          if (menusCurrentPage > newTotalPages && newTotalPages > 0) {
+            setMenusCurrentPage(newTotalPages);
+          }
+        }, 100);
+        if (onDataChange) onDataChange();
+        showNotification('Xóa menu thành công!', 'success');
+      } catch (error) {
+        console.error('Error deleting menu:', error);
+        showNotification('Lỗi khi xóa menu: ' + error.message, 'error');
+      }
     }
   };
 
@@ -253,6 +302,11 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
 
   return (
     <div className="admin-dashboard">
+      {isLoading && <Loading />}
+      <NotificationStack 
+        notifications={notifications} 
+        onRemove={removeNotification} 
+      />
       <div className="admin-header">
         <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
           <img src="/logo-onfa-scaled.png" alt="ONFA" style={{ height: '40px', width: 'auto' }} />
@@ -279,16 +333,16 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
                   });
                   
                   if (response.ok) {
-                    alert('✅ Đã export và lưu vào file JSON!\n\n📥 File wiki-data.json đã được tải về\n💾 File public/data/wiki-data.json đã được cập nhật\n\n🚀 Để deploy:\n1. File JSON đã sẵn sàng trong public/data/wiki-data.json\n2. Deploy lại website');
+                    showNotification('Đã export và lưu vào file JSON thành công!', 'success');
                   } else {
-                    alert('✅ Đã export file JSON!\n\n📥 File wiki-data.json đã được tải về\n\n🚀 Để deploy:\n1. Mở file wiki-data.json vừa tải về\n2. Copy nội dung\n3. Paste vào file public/data/wiki-data.json\n4. Deploy lại website\n\n⚠️ Lưu ý: Server API không chạy, cần copy thủ công');
+                    showNotification('Đã export file JSON! File đã được tải về.', 'success');
                   }
                 } catch (apiError) {
-                  alert('✅ Đã export file JSON!\n\n📥 File wiki-data.json đã được tải về\n\n🚀 Để deploy:\n1. Mở file wiki-data.json vừa tải về\n2. Copy nội dung\n3. Paste vào file public/data/wiki-data.json\n4. Deploy lại website\n\n⚠️ Lưu ý: Server API không chạy, cần copy thủ công');
+                  showNotification('Đã export file JSON! File đã được tải về.', 'success');
                 }
               } catch (error) {
                 console.error('Export error:', error);
-                alert('❌ Lỗi khi export: ' + error.message);
+                showNotification('Lỗi khi export: ' + error.message, 'error');
               }
             }}
             style={{ 
@@ -309,9 +363,9 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
             onClick={async () => {
               try {
                 await syncDataToJSON();
-                alert('✅ Đã sync vào file JSON thành công!\n\nFile public/data/wiki-data.json đã được cập nhật.');
+                showNotification('Đã sync vào file JSON thành công!', 'success');
               } catch (error) {
-                alert('❌ Sync thất bại: ' + error.message + '\n\n💡 Hãy chạy: npm run dev để bật server API');
+                showNotification('Sync thất bại: ' + error.message, 'error', 5000);
               }
             }}
             style={{ 
@@ -353,13 +407,13 @@ function AdminDashboard({ onDataChange, onClose, onLogout }) {
               if (file) {
                 try {
                   await importDataFromJSON(file);
-                  loadData();
-                  alert('✅ Import thành công!\n\nDữ liệu đã được khôi phục từ file JSON.');
+                  await loadData();
+                  showNotification('Import thành công! Dữ liệu đã được khôi phục từ file JSON.', 'success');
                   if (onDataChange) {
                     onDataChange();
                   }
                 } catch (error) {
-                  alert('❌ Import thất bại: ' + error.message);
+                  showNotification('Import thất bại: ' + error.message, 'error');
                 }
                 // Reset input
                 if (fileInputRef.current) {
