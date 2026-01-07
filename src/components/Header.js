@@ -163,7 +163,7 @@ function Header({ onPageNavigate }) {
     <header className="main-header">
       <div className="header-container">
         {/* Logo */}
-        <a href="/" className="header-logo">
+        <a href="https://onfa.io/" className="header-logo">
           <img src="/logo-onfa-scaled.png" alt="ONFA" className="onfa-logo" />
         </a>
 

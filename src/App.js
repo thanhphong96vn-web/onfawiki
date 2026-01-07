@@ -45,21 +45,132 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const isNavigatingFromClick = useRef(false);
+  const hasProcessedInitialHash = useRef(false);
+
+  // Effect để xử lý hash khi data đã load (chỉ chạy một lần khi data load xong)
+  useEffect(() => {
+    // Chỉ xử lý hash khi data đã được load (pages và menus không rỗng) và chưa xử lý hash ban đầu
+    if ((pages.length === 0 && menus.length === 0) || hasProcessedInitialHash.current) {
+      return;
+    }
+    
+    // Nếu đang navigate từ click, bỏ qua để tránh conflict
+    if (isNavigatingFromClick.current) {
+      return;
+    }
+    
+    // Đánh dấu đã xử lý hash ban đầu
+    hasProcessedInitialHash.current = true;
+    
+    // Decode hash để xử lý ký tự đặc biệt và tiếng Việt
+    const rawHash = window.location.hash.replace('#', '');
+    let hash = '';
+    
+    // Thử decode với nhiều cách để xử lý các trường hợp encoding khác nhau
+    try {
+      hash = decodeURIComponent(rawHash);
+    } catch (e) {
+      // Nếu decodeURIComponent fail, thử decodeURI
+      try {
+        hash = decodeURI(rawHash);
+      } catch (e2) {
+        // Nếu cả hai đều fail, dùng raw hash
+        hash = rawHash;
+      }
+    }
+    
+    if (hash === 'admin') {
+      // Nếu hash là 'admin', kiểm tra authentication
+      if (isAdminAuthenticated) {
+        setShowAdmin(true);
+      } else {
+        setShowAdmin(true); // Vẫn set showAdmin để hiển thị login form
+      }
+      setActivePageId(null);
+      return;
+    }
+    
+    setShowAdmin(false);
+    
+    if (hash) {
+      // Tìm page từ pages đã load
+      let page = pages.find(p => p.id === hash);
+      
+      // Nếu không tìm thấy với hash đã decode, thử tìm với raw hash
+      if (!page) {
+        page = pages.find(p => p.id === rawHash);
+      }
+      
+      // Nếu vẫn không tìm thấy, thử tìm với các cách encode khác nhau
+      if (!page && rawHash) {
+        // Thử tìm với encodeURIComponent
+        const encodedHash = encodeURIComponent(rawHash);
+        page = pages.find(p => p.id === encodedHash);
+      }
+      
+      if (page) {
+        // Tìm thấy page, set activePageId
+        console.log('✅ Found page from hash:', page.id);
+        setActivePageId(page.id);
+        // Đảm bảo hash trong URL được encode đúng cách
+        if (window.location.hash !== `#${encodeURIComponent(page.id)}`) {
+          window.location.hash = encodeURIComponent(page.id);
+        }
+      } else {
+        console.warn('⚠️ Page not found for hash:', hash, 'rawHash:', rawHash);
+        // Nếu không tìm thấy page với hash hiện tại, load page đầu tiên
+        const firstPage = getFirstPageFromMenus(menus, pages);
+        if (firstPage) {
+          console.log('📍 Loading first page instead:', firstPage.id);
+          setActivePageId(firstPage.id);
+          window.location.hash = encodeURIComponent(firstPage.id);
+        }
+      }
+    } else {
+      // Nếu không có hash, tìm page đầu tiên từ menu đầu tiên
+      const firstPage = getFirstPageFromMenus(menus, pages);
+      if (firstPage) {
+        setActivePageId(firstPage.id);
+        window.location.hash = encodeURIComponent(firstPage.id);
+      } else {
+        setActivePageId(null);
+      }
+    }
+  }, [pages, menus, isAdminAuthenticated]); // Chạy lại khi pages hoặc menus thay đổi
 
   useEffect(() => {
     let isMounted = true;
     let previousHash = window.location.hash;
     
-    // Hàm để cập nhật activePageId từ URL hash
+    // Hàm để cập nhật activePageId từ URL hash (cho hashchange event)
     const updateFromHash = () => {
       // Nếu đang navigate từ click, bỏ qua để tránh conflict
       if (isNavigatingFromClick.current) {
         return;
       }
       
+      // Nếu data chưa load, không làm gì (sẽ được xử lý bởi effect trên)
+      if (pages.length === 0 && menus.length === 0) {
+        return;
+      }
+      
       // Decode hash để xử lý ký tự đặc biệt và tiếng Việt
       const rawHash = window.location.hash.replace('#', '');
-      const hash = decodeURIComponent(rawHash);
+      let hash = '';
+      
+      // Thử decode với nhiều cách để xử lý các trường hợp encoding khác nhau
+      try {
+        hash = decodeURIComponent(rawHash);
+      } catch (e) {
+        // Nếu decodeURIComponent fail, thử decodeURI
+        try {
+          hash = decodeURI(rawHash);
+        } catch (e2) {
+          // Nếu cả hai đều fail, dùng raw hash
+          hash = rawHash;
+        }
+      }
+      
       const wasInAdmin = previousHash === '#admin';
       
       if (hash === 'admin') {
@@ -74,25 +185,42 @@ function App() {
         // Nếu có hash khác hoặc không có hash, tắt admin và load page
         if (wasInAdmin) {
           // Nếu đang ở admin và chuyển về trang chính, reload data từ database
+          hasProcessedInitialHash.current = false; // Reset để xử lý hash lại sau khi reload
           loadData();
         }
         setShowAdmin(false);
         
         if (hash) {
-          // Tìm page từ state pages đã được load
-          const page = pages.find(p => p.id === hash);
+          // Tìm page từ pages đã load
+          let page = pages.find(p => p.id === hash);
+          
+          // Nếu không tìm thấy với hash đã decode, thử tìm với raw hash
+          if (!page) {
+            page = pages.find(p => p.id === rawHash);
+          }
+          
+          // Nếu vẫn không tìm thấy, thử tìm với các cách encode khác nhau
+          if (!page && rawHash) {
+            // Thử tìm với encodeURIComponent
+            const encodedHash = encodeURIComponent(rawHash);
+            page = pages.find(p => p.id === encodedHash);
+          }
+          
           if (page) {
-            // Chỉ update nếu hash khác với activePageId hiện tại để tránh re-render không cần thiết
-            setActivePageId(prevId => prevId === hash ? prevId : hash);
-          } else {
-            // Nếu không tìm thấy page, thử tìm với raw hash (không decode)
-            const pageWithRawHash = pages.find(p => p.id === rawHash);
-            if (pageWithRawHash) {
-              setActivePageId(rawHash);
-            } else {
-              // Nếu vẫn không tìm thấy, chỉ reset nếu đang ở một page khác
-              setActivePageId(prevId => prevId === hash ? prevId : null);
+            // Tìm thấy page, set activePageId
+            setActivePageId(page.id);
+            // Đảm bảo hash trong URL được encode đúng cách
+            if (window.location.hash !== `#${encodeURIComponent(page.id)}`) {
+              window.location.hash = encodeURIComponent(page.id);
             }
+          } else {
+            // Nếu không tìm thấy page, chỉ reset nếu đang ở một page khác
+            setActivePageId(prevId => {
+              if (prevId !== hash && prevId !== rawHash) {
+                return null;
+              }
+              return prevId;
+            });
           }
         } else {
           // Nếu không có hash, tìm page đầu tiên từ menu đầu tiên
@@ -121,18 +249,16 @@ function App() {
       try {
         console.log('Initializing data load...');
         await loadData();
-        if (isMounted) {
-          console.log('Data loaded, updating hash...');
-          // Load từ URL hash ban đầu sau khi data đã load
-          updateFromHash();
-        }
+        console.log('Data loaded successfully');
+        // Reset flag để có thể xử lý hash lại sau khi reload data
+        hasProcessedInitialHash.current = false;
       } catch (error) {
         console.error('Error loading data:', error);
         // Nếu không load được, thử load lại một lần nữa
         if (isMounted) {
           try {
             await loadData();
-            updateFromHash();
+            hasProcessedInitialHash.current = false;
           } catch (retryError) {
             console.error('Retry failed:', retryError);
             // Nếu vẫn fail, set empty để UI hiển thị thông báo
